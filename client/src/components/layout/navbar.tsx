@@ -1,0 +1,140 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Bell, MessageCircle, Search, MapPin, Menu, X, User, LogOut, Settings, ChevronDown,
+} from "@/components/ui/icons";
+import { PUBLIC_NAV } from "@/config/site";
+import { ROUTES } from "@/lib/constants";
+
+export function Navbar() {
+  const [open, setOpen] = React.useState(false);
+  const [menu, setMenu] = React.useState(false);
+
+  return (
+    <header className="sticky top-0 z-40 bg-white border-b border-border">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 h-16 flex items-center gap-4">
+        {/* Logo */}
+        <Link href={ROUTES.HOME} className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center text-white font-bold text-sm">
+            iX
+          </div>
+          <span className="text-lg font-bold text-foreground tracking-tight">
+            Idle<span className="text-primary">X</span>
+          </span>
+        </Link>
+
+        {/* Location (desktop) */}
+        <button className="hidden lg:flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <MapPin size={16} />
+          Bhimavaram
+          <ChevronDown size={14} />
+        </button>
+
+        {/* Search (desktop) */}
+        <div className="hidden md:flex flex-1 max-w-xl mx-4">
+          <div className="relative w-full">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search for items (camera, tent, bike...)"
+              className="w-full h-10 pl-10 pr-4 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
+          </div>
+        </div>
+
+        {/* Right side */}
+        <div className="ml-auto flex items-center gap-2">
+          <Link href={ROUTES.MESSAGES} className="hidden sm:inline-flex relative h-10 w-10 items-center justify-center rounded-full hover:bg-muted">
+            <MessageCircle size={20} />
+            <span className="absolute top-1.5 right-1.5 h-4 min-w-4 px-1 text-[10px] font-bold rounded-full bg-danger text-white flex items-center justify-center">2</span>
+          </Link>
+          <Link href={ROUTES.NOTIFICATIONS} className="hidden sm:inline-flex relative h-10 w-10 items-center justify-center rounded-full hover:bg-muted">
+            <Bell size={20} />
+            <span className="absolute top-1.5 right-1.5 h-4 min-w-4 px-1 text-[10px] font-bold rounded-full bg-danger text-white flex items-center justify-center">3</span>
+          </Link>
+          <Link href={ROUTES.BECOME_HOST} className="hidden md:inline-flex">
+            <Button variant="primary" size="sm">Become a Host</Button>
+          </Link>
+
+          {/* User menu */}
+          <div className="relative">
+            <button
+              onClick={() => setMenu((m) => !m)}
+              className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border border-border hover:shadow-md transition-shadow"
+            >
+              <Menu size={16} />
+              <Avatar name="Rahul Verma" size="sm" />
+            </button>
+            {menu && (
+              <div
+                className="absolute right-0 mt-2 w-64 rounded-xl border border-border bg-card shadow-lg p-2 z-50"
+                onClick={() => setMenu(false)}
+              >
+                <div className="p-3 border-b border-border mb-2">
+                  <p className="text-sm font-semibold">Rahul Verma</p>
+                  <p className="text-xs text-muted-foreground">rahul.verma@example.com</p>
+                </div>
+                <MenuLink href={ROUTES.DASHBOARD} icon={<User size={16} />}>Dashboard</MenuLink>
+                <MenuLink href={ROUTES.MY_LISTINGS} icon={<Settings size={16} />}>My Listings</MenuLink>
+                <MenuLink href={ROUTES.MY_RENTALS} icon={<User size={16} />}>My Bookings</MenuLink>
+                <MenuLink href={ROUTES.PROFILE} icon={<User size={16} />}>Profile</MenuLink>
+                <MenuLink href={ROUTES.SETTINGS} icon={<Settings size={16} />}>Settings</MenuLink>
+                <hr className="my-2 border-border" />
+                <MenuLink href={ROUTES.LOGIN} icon={<LogOut size={16} />}>Logout</MenuLink>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile menu toggle */}
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="md:hidden h-10 w-10 inline-flex items-center justify-center rounded-md hover:bg-muted"
+        >
+          {open ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+
+      {/* Mobile dropdown nav */}
+      {open && (
+        <div className="md:hidden border-t border-border bg-white px-4 py-3 space-y-2">
+          <div className="relative">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search for items..."
+              className="w-full h-10 pl-10 pr-4 rounded-lg border border-border text-sm"
+            />
+          </div>
+          {PUBLIC_NAV.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="block px-3 py-2 text-sm rounded-md text-foreground hover:bg-muted"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </header>
+  );
+}
+
+function MenuLink({
+  href, icon, children,
+}: { href: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-muted"
+    >
+      <span className="text-muted-foreground">{icon}</span>
+      {children}
+    </Link>
+  );
+}
