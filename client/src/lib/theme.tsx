@@ -15,18 +15,15 @@ const ThemeContext = createContext<ThemeContextType>({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("system");
-
-  // Initialize from localStorage (client-side only)
-  useEffect(() => {
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "system";
     try {
       const saved = localStorage.getItem("theme") as Theme | null;
-      if (saved) setTheme(saved);
-      else setTheme("system");
-    } catch (e) {
-      setTheme("system");
+      return saved ?? "system";
+    } catch {
+      return "system";
     }
-  }, []);
+  });
 
   // Apply theme to documentElement and persist preference
   useEffect(() => {
@@ -44,7 +41,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     try {
       localStorage.setItem("theme", theme);
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, [theme]);

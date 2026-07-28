@@ -17,6 +17,7 @@ export const ROUTES = {
 
   // Auth
   SIGN_UP: "/sign-up",
+  REGISTER: "/register",
   LOGIN: "/login",
   FORGOT_PASSWORD: "/forgot-password",
   VERIFY_OTP: "/verify-otp",

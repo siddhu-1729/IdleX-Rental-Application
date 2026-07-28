@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Stepper } from "@/components/ui/stepper";
 import { Badge } from "@/components/ui/badge";
-import { Upload } from "@/components/ui/icons";
+import { Checkbox, RadioGroup } from "@/components/ui/form-controls";
+import { Clock, Repeat, Upload } from "@/components/ui/icons";
 
 export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "otp" }) {
   const titles = {
@@ -38,13 +39,16 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
 }
 
 export function ListingStepperForm({ edit = false }: { edit?: boolean }) {
+  const [extensionPricing, setExtensionPricing] = React.useState("custom");
+
   return (
     <div className="space-y-6">
       <Stepper
-        current={edit ? 3 : 1}
+        current={edit ? 4 : 1}
         steps={[
           { id: "basics", title: "Basics" },
           { id: "pricing", title: "Pricing" },
+          { id: "extension", title: "Extension" },
           { id: "photos", title: "Photos" },
           { id: "review", title: "Review" },
         ]}
@@ -66,6 +70,91 @@ export function ListingStepperForm({ edit = false }: { edit?: boolean }) {
           <div className="text-center text-sm text-muted-foreground">
             <Upload className="mx-auto mb-2" />
             Upload product photos
+          </div>
+        </div>
+      </div>
+      <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Repeat className="text-primary" />
+              <h2 className="text-lg font-semibold">Rental Extension Setting</h2>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Give renters the flexibility to extend their rental before it ends.
+            </p>
+          </div>
+          <Checkbox defaultChecked label="Allow Extension" />
+        </div>
+        <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_320px]">
+          <div className="space-y-5">
+            <div>
+              <p className="mb-2 text-sm font-medium">Extension Pricing</p>
+              <RadioGroup
+                name="extension-pricing"
+                value={extensionPricing}
+                onChange={setExtensionPricing}
+                options={[
+                  { value: "same", label: "Same as normal rate" },
+                  { value: "custom", label: "Custom extension rate, higher than normal rate" },
+                ]}
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <Input
+                label="Extension Daily Rate"
+                defaultValue="20"
+                rightIcon={<span className="text-xs font-semibold">%</span>}
+                hint="Example: if normal rate is Rs 100/day, extension rate will be Rs 120/day."
+              />
+              <Select
+                label="Request Before"
+                defaultValue="12"
+                options={[
+                  { value: "6", label: "6 hours before booking ends" },
+                  { value: "12", label: "12 hours before booking ends" },
+                  { value: "24", label: "24 hours before booking ends" },
+                ]}
+              />
+              <Select
+                label="Maximum Extension Period"
+                defaultValue="3"
+                options={[
+                  { value: "1", label: "1 day" },
+                  { value: "3", label: "3 days" },
+                  { value: "7", label: "7 days" },
+                ]}
+              />
+            </div>
+            <Select
+              label="Approval"
+              defaultValue="owner"
+              options={[
+                { value: "owner", label: "Owner approval required" },
+                { value: "auto", label: "Auto approve if item is available" },
+                { value: "manual", label: "Manual review for every request" },
+              ]}
+            />
+          </div>
+          <div className="rounded-lg bg-primary-50 p-4">
+            <div className="flex items-center gap-2 text-primary">
+              <Clock size={18} />
+              <span className="text-sm font-semibold">Live renter preview</span>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-primary-900">
+              Renters will see extension eligibility before they book and can request extra days from
+              their booking detail page.
+            </p>
+            <div className="mt-4 rounded-lg bg-white p-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Max extension</span>
+                <strong>3 days</strong>
+              </div>
+              <div className="mt-2 flex justify-between">
+                <span className="text-muted-foreground">Approval</span>
+                <strong>Owner</strong>
+              </div>
+            </div>
           </div>
         </div>
       </div>

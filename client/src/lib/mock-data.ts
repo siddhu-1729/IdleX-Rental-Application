@@ -71,6 +71,14 @@ export const bookings = [
     amount: 4350,
     status: "Confirmed",
     next: "Pickup verification at 10:30 AM",
+    extension: {
+      available: true,
+      currentReturn: "29 Jul, 7:00 PM",
+      dailyRate: 1600,
+      maxDays: 3,
+      approval: "Owner approval required",
+      notice: "Request before 12 hours of return time",
+    },
   },
   {
     id: "rent-1038",
@@ -79,6 +87,14 @@ export const bookings = [
     amount: 1080,
     status: "Ongoing",
     next: "Return due today by 7:00 PM",
+    extension: {
+      available: true,
+      currentReturn: "24 Jul, 7:00 PM",
+      dailyRate: 420,
+      maxDays: 2,
+      approval: "Auto approval if no upcoming booking",
+      notice: "Request before 6 hours of return time",
+    },
   },
   {
     id: "rent-1020",
@@ -87,6 +103,14 @@ export const bookings = [
     amount: 440,
     status: "Completed",
     next: "Review the owner",
+    extension: {
+      available: false,
+      currentReturn: "13 Jul, 6:00 PM",
+      dailyRate: 260,
+      maxDays: 0,
+      approval: "Rental completed",
+      notice: "Extensions close after return verification",
+    },
   },
 ];
 

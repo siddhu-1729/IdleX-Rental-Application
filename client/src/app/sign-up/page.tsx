@@ -1,5 +1,6 @@
-import { AuthPanel } from "@/components/marketplace/forms";
+import { redirect } from "next/navigation";
+import { ROUTES } from "@/lib/constants";
 
 export default function SignUpPage() {
-  return <main className="grid min-h-screen place-items-center bg-muted px-4 py-10"><AuthPanel mode="sign-up" /></main>;
+  redirect(ROUTES.REGISTER);
 }
