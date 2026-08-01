@@ -1,5 +1,9 @@
-import { AdminOverview } from "@/components/marketplace/admin-pages";
+import { AdminOverview, AdminGate } from "@/components/marketplace/admin-pages";
 
 export default function AdminPage() {
-  return <AdminOverview />;
+  return (
+    <AdminGate>
+      <AdminOverview />
+    </AdminGate>
+  );
 }

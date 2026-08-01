@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Calendar, CheckCircle, Clock, Repeat, Wallet } from "@/components/ui/icons";
 import { formatCurrency } from "@/lib/formatters";
+import { api } from "@/lib/api-client";
+import { errorMessage } from "@/lib/auth";
+import type { Booking } from "@/lib/api-types";
 
 type Extension = {
   available: boolean;
@@ -16,9 +19,12 @@ type Extension = {
   notice: string;
 };
 
-export function RentalExtensionPanel({ extension }: { extension: Extension }) {
+export function RentalExtensionPanel({ extension, bookingId }: { extension: Extension; bookingId: string }) {
   const [days, setDays] = React.useState(extension.available ? 1 : 0);
+  const [message, setMessage] = React.useState("");
   const [submitted, setSubmitted] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const extensionTotal = days * extension.dailyRate;
 
   if (!extension.available) {
@@ -32,6 +38,24 @@ export function RentalExtensionPanel({ extension }: { extension: Extension }) {
       </div>
     );
   }
+
+  const sendRequest = async () => {
+    setError(null);
+    setSending(true);
+    try {
+      const requestedNewEndDate = new Date();
+      requestedNewEndDate.setDate(requestedNewEndDate.getDate() + days);
+      await api.post<Booking>(`/api/bookings/${bookingId}/extension-request`, {
+        requestedNewEndDate: requestedNewEndDate.toISOString(),
+        reason: message || undefined,
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -64,6 +88,8 @@ export function RentalExtensionPanel({ extension }: { extension: Extension }) {
           <Input label="Approval rule" value={extension.approval} readOnly className="md:col-span-2" />
           <Textarea
             label="Message to owner"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
             placeholder="Tell the owner why you need more time..."
             className="md:col-span-2"
           />
@@ -76,11 +102,13 @@ export function RentalExtensionPanel({ extension }: { extension: Extension }) {
             <SummaryRow icon={<Wallet size={16} />} label="Amount due" value={formatCurrency(extensionTotal)} />
             <SummaryRow icon={<Clock size={16} />} label="Deadline" value={extension.notice} />
           </div>
+          {error && <p className="mt-3 rounded-md bg-danger-50 p-3 text-xs text-danger">{error}</p>}
           <Button
             className="mt-5"
             fullWidth
+            loading={sending}
             leftIcon={submitted ? <CheckCircle size={16} /> : <Repeat size={16} />}
-            onClick={() => setSubmitted(true)}
+            onClick={sendRequest}
           >
             {submitted ? "Request Sent" : "Send Extension Request"}
           </Button>

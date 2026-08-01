@@ -1,5 +1,9 @@
-import { AdminSectionPage } from "@/components/marketplace/admin-pages";
+import { AdminUsersPage, AdminGate } from "@/components/marketplace/admin-pages";
 
-export default function AdminUsersPage() {
-  return <AdminSectionPage title="Users" description="Review renters, owners, roles, trust score, and account status." />;
+export default function AdminUsersRoute() {
+  return (
+    <AdminGate>
+      <AdminUsersPage />
+    </AdminGate>
+  );
 }

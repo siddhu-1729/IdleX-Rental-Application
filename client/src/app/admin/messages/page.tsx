@@ -1,5 +1,9 @@
-import { AdminSectionPage } from "@/components/marketplace/admin-pages";
+import { AdminGate, AdminSectionPage } from "@/components/marketplace/admin-pages";
 
 export default function AdminMessagesPage() {
-  return <AdminSectionPage title="Messages" description="Inspect support-linked conversations and moderation escalations." />;
+  return (
+    <AdminGate>
+      <AdminSectionPage title="Messages" description="Review conversations and resolve user issues." />
+    </AdminGate>
+  );
 }

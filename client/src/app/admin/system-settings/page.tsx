@@ -1,5 +1,9 @@
-import { AdminSectionPage } from "@/components/marketplace/admin-pages";
+import { AdminGate, AdminSectionPage } from "@/components/marketplace/admin-pages";
 
 export default function AdminSystemSettingsPage() {
-  return <AdminSectionPage title="System Settings" description="Tune platform fees, deposit rules, risk thresholds, and feature toggles." />;
+  return (
+    <AdminGate>
+      <AdminSectionPage title="System Settings" description="Configure platform settings, fees, and policies." />
+    </AdminGate>
+  );
 }

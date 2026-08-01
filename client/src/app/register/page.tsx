@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/form-controls";
@@ -18,6 +19,7 @@ import {
   Wallet,
 } from "@/components/ui/icons";
 import { ROUTES } from "@/lib/constants";
+import { useAuth, errorMessage } from "@/lib/auth";
 
 const roles = [
   {
@@ -35,7 +37,34 @@ const roles = [
 ] as const;
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const { register } = useAuth();
   const [role, setRole] = React.useState<(typeof roles)[number]["id"]>("renter");
+  const [name, setName] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    setLoading(true);
+    try {
+      const user = await register({ name, email, phone, password, becomeOwner: role === "owner" });
+      router.push(user.role === "admin" ? ROUTES.ADMIN : ROUTES.DASHBOARD);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-white">
@@ -119,7 +148,7 @@ export default function RegisterPage() {
               </Link>
             </div>
 
-            <form className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-7">
+            <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-7">
               <Badge className="border-violet-200 bg-violet-50 text-violet-700">Register</Badge>
               <h2 className="mt-4 text-3xl font-bold text-foreground">Tell us your initial details</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -152,9 +181,9 @@ export default function RegisterPage() {
               </div>
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <Input label="Full name" name="fullName" placeholder="Venkata Siddhardha" required />
-                <Input label="Phone number" name="phone" type="tel" placeholder="+91 98765 43210" required />
-                <Input label="Email address" name="email" type="email" placeholder="siddhu@example.com" required />
+                <Input label="Full name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Venkata Siddhardha" required />
+                <Input label="Phone number" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" required />
+                <Input label="Email address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="siddhu@example.com" required />
                 <Select
                   label="City"
                   name="city"
@@ -166,8 +195,8 @@ export default function RegisterPage() {
                     { value: "eluru", label: "Eluru" },
                   ]}
                 />
-                <Input label="Password" name="password" type="password" placeholder="Create password" required />
-                <Input label="Confirm password" name="confirmPassword" type="password" placeholder="Repeat password" required />
+                <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create password" required />
+                <Input label="Confirm password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat password" required />
               </div>
 
               <input type="hidden" name="role" value={role} />
@@ -186,7 +215,9 @@ export default function RegisterPage() {
                 />
               </div>
 
-              <Button className="mt-5" fullWidth size="lg" rightIcon={<ArrowRight size={18} />}>
+              {error && <p className="mt-4 rounded-md bg-danger-50 p-3 text-sm text-danger">{error}</p>}
+
+              <Button className="mt-5" fullWidth size="lg" rightIcon={<ArrowRight size={18} />} loading={loading}>
                 Register Account
               </Button>
             </form>

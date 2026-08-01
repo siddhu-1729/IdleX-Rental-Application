@@ -1,0 +1,265 @@
+/**
+ * TypeScript mirrors of the backend (Express + Mongoose) entities.
+ * Keep field names in sync with idlex-backend/src/models/*.
+ */
+
+export type ApiEnvelope<T> = {
+  success: boolean;
+  message: string;
+  data: T;
+};
+
+export type UserRole = "renter" | "owner" | "admin";
+
+export type User = {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: UserRole;
+  isOwner: boolean;
+  isRenter: boolean;
+  isPhoneVerified: boolean;
+  isEmailVerified: boolean;
+  isActive: boolean;
+  avatarUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ListingPhoto = {
+  _id: string;
+  url: string;
+  caption: string;
+  order: number;
+};
+
+export type AvailabilityBlock = {
+  _id: string;
+  startDate: string;
+  endDate: string;
+  reason?: string;
+};
+
+export type ListingStatus = "draft" | "published" | "paused";
+
+export type Listing = {
+  _id: string;
+  owner: string | Pick<User, "_id" | "name" | "avatarUrl">;
+  title: string;
+  description: string;
+  category: string;
+  pricePerDay: number;
+  securityDeposit: number;
+  location?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    lat?: number;
+    lng?: number;
+  };
+  photos: ListingPhoto[];
+  availability: AvailabilityBlock[];
+  status: ListingStatus;
+  ratingAvg: number;
+  ratingCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ListingQueryResult = {
+  items: Listing[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+};
+
+export type BookingStatus =
+  | "requested"
+  | "confirmed"
+  | "active"
+  | "completed"
+  | "cancelled"
+  | "disputed";
+
+export type ExtensionRequest = {
+  _id: string;
+  requestedNewEndDate: string;
+  reason?: string;
+  status: "pending" | "approved" | "rejected";
+  requestedAt: string;
+  respondedAt?: string;
+};
+
+export type Booking = {
+  _id: string;
+  listing: string | Listing;
+  renter: string | Pick<User, "_id" | "name" | "avatarUrl">;
+  owner: string | Pick<User, "_id" | "name" | "avatarUrl">;
+  startDate: string;
+  endDate: string;
+  status: BookingStatus;
+  pricePerDay: number;
+  totalDays: number;
+  subtotal: number;
+  serviceFee: number;
+  securityDeposit: number;
+  totalAmount: number;
+  cancelledBy: string | null;
+  cancellationReason: string | null;
+  extensionRequests: ExtensionRequest[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PaymentStatus = "created" | "authorized" | "captured" | "failed" | "refunded";
+
+export type Payment = {
+  _id: string;
+  booking: string;
+  payer: string;
+  gateway: string;
+  gatewayOrderId: string;
+  gatewayPaymentId: string | null;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  createdAt: string;
+};
+
+export type Payout = {
+  _id: string;
+  owner: string;
+  booking: string;
+  amount: number;
+  status: "pending" | "processing" | "paid" | "failed";
+  gatewayPayoutId: string | null;
+  createdAt: string;
+};
+
+export type PayoutSettings = {
+  _id: string;
+  owner: string;
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifscOrRoutingNumber?: string;
+  bankName?: string;
+};
+
+export type KycStatus = "not_started" | "in_progress" | "pending" | "approved" | "rejected";
+export type KycStep = "id-upload" | "selfie" | "bank-details" | "completed";
+
+export type Kyc = {
+  _id: string;
+  user: string | Pick<User, "_id" | "name" | "email" | "phone">;
+  status: KycStatus;
+  currentStep: KycStep;
+  idDocument?: { type?: string; fileUrl?: string; uploadedAt?: string };
+  selfie?: { fileUrl?: string; uploadedAt?: string };
+  bankDetails?: {
+    accountHolderName?: string;
+    accountNumber?: string;
+    ifscOrRoutingNumber?: string;
+    bankName?: string;
+  };
+  rejectionReason?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Review = {
+  _id: string;
+  booking: string;
+  listing: string;
+  reviewer: string | Pick<User, "_id" | "name" | "avatarUrl">;
+  rating: number;
+  comment: string;
+  createdAt: string;
+};
+
+export type Conversation = {
+  _id: string;
+  participants: Array<string | Pick<User, "_id" | "name" | "avatarUrl">>;
+  listing: string | null | Listing;
+  lastMessage: string;
+  lastMessageAt: string;
+  createdAt: string;
+};
+
+export type Message = {
+  _id: string;
+  conversation: string;
+  sender: string | Pick<User, "_id" | "name" | "avatarUrl">;
+  text: string;
+  readBy: string[];
+  createdAt: string;
+};
+
+export type Dispute = {
+  _id: string;
+  booking: string | Booking;
+  raisedBy: string | Pick<User, "_id" | "name" | "email">;
+  reason: string;
+  status: "open" | "under_review" | "resolved" | "rejected";
+  resolutionNote: string | null;
+  resolvedBy: string | null;
+  createdAt: string;
+};
+
+export type AdminStats = {
+  totalUsers: number;
+  totalListings: number;
+  activeBookings: number;
+  totalRevenue: number;
+};
+
+export type AuthResult = {
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+};
+
+export function ownerName(owner: Listing["owner"]): string {
+  if (typeof owner === "object" && owner !== null) return (owner as { name?: string }).name || "Owner";
+  return "Owner";
+}
+
+export function ownerAvatar(owner: Listing["owner"]): string | undefined {
+  if (typeof owner === "object" && owner !== null) return (owner as { avatarUrl?: string }).avatarUrl ?? undefined;
+  return undefined;
+}
+
+export function listingImage(listing: Listing): string {
+  return listing.photos?.[0]?.url || "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80";
+}
+
+export function listingCity(listing: Listing): string {
+  return listing.location?.city || "India";
+}
+
+export type ListingCardShape = {
+  id: string;
+  title: string;
+  category: string;
+  location: string;
+  price: number;
+  rating: number;
+  reviews: number;
+  image: string;
+  tags: string[];
+};
+
+export function toCard(listing: Listing): ListingCardShape {
+  return {
+    id: listing._id,
+    title: listing.title,
+    category: listing.category,
+    location: listing.location?.city || "India",
+    price: listing.pricePerDay,
+    rating: listing.ratingAvg || 0,
+    reviews: listing.ratingCount || 0,
+    image: listingImage(listing),
+    tags: [listing.status === "published" ? "Available" : listing.status],
+  };
+}

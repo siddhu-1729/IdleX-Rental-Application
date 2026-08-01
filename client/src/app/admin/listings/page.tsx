@@ -1,5 +1,9 @@
-import { AdminSectionPage } from "@/components/marketplace/admin-pages";
+import { AdminListingsPage, AdminGate } from "@/components/marketplace/admin-pages";
 
-export default function AdminListingsPage() {
-  return <AdminSectionPage title="Listings" description="Moderate listing quality, pricing, images, and availability state." />;
+export default function AdminListingsRoute() {
+  return (
+    <AdminGate>
+      <AdminListingsPage />
+    </AdminGate>
+  );
 }

@@ -1,8 +1,14 @@
+"use client";
+
+import * as React from "react";
 import Link from "next/link";
 import { PublicShell } from "@/components/marketplace/app-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { categoryStats, listings } from "@/lib/mock-data";
+import { categoryStats } from "@/lib/mock-data";
+import { useFetchData } from "@/lib/use-fetch-data";
+import { listingImage } from "@/lib/api-types";
+import type { ListingQueryResult } from "@/lib/api-types";
 import { ROUTES } from "@/lib/constants";
 import {
   ArrowRight,
@@ -36,21 +42,21 @@ const categoryIcons = {
   Sports: Bike,
 };
 
-const heroTiles = [
-  { className: "col-span-2 row-span-2", listing: listings[0] },
-  { className: "col-span-1 row-span-1", listing: listings[2] },
-  { className: "col-span-1 row-span-1", listing: listings[3] },
-  { className: "col-span-1 row-span-1", listing: listings[1] },
-  {
-    className: "col-span-1 row-span-1",
-    listing: {
+export default function Home() {
+  const { data } = useFetchData<ListingQueryResult>("/api/listings?status=published&limit=4", []);
+
+  const tiles = [
+    { className: "col-span-2 row-span-2", image: data?.items[0] ? listingImage(data.items[0]) : "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80", title: data?.items[0]?.title ?? "Camera kit" },
+    { className: "col-span-1 row-span-1", image: data?.items[1] ? listingImage(data.items[1]) : "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80", title: data?.items[1]?.title ?? "Drill set" },
+    { className: "col-span-1 row-span-1", image: data?.items[2] ? listingImage(data.items[2]) : "https://images.unsplash.com/photo-1626379953822-baec19c3accd?auto=format&fit=crop&w=1200&q=80", title: data?.items[2]?.title ?? "Projector" },
+    { className: "col-span-1 row-span-1", image: data?.items[3] ? listingImage(data.items[3]) : "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=1200&q=80", title: data?.items[3]?.title ?? "City bike" },
+    {
+      className: "col-span-1 row-span-1",
       image: "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&w=900&q=80",
       title: "Weekend camping tent",
     },
-  },
-];
+  ];
 
-export default function Home() {
   return (
     <PublicShell>
       <section className="bg-white">
@@ -78,7 +84,7 @@ export default function Home() {
             </div>
             <div className="mt-10 grid max-w-lg grid-cols-3 gap-5">
               {[
-                ["10K+", "Active Listings"],
+                [`${(data?.pagination.total ?? 10000).toLocaleString("en-IN")}+`, "Active Listings"],
                 ["5K+", "Happy Renters"],
                 ["4.8", "Average Rating"],
               ].map(([value, label]) => (
@@ -91,26 +97,13 @@ export default function Home() {
           </div>
           <div className="relative min-h-130">
             <div className="grid h-full grid-cols-3 grid-rows-4 gap-4">
-              {heroTiles.map(({ listing, className }, index) => (
-                <div key={`${listing.title}-${index}`} className={`${className} overflow-hidden rounded-2xl bg-muted shadow-sm`}>
+              {tiles.map(({ image, title, className }, index) => (
+                <div key={`${title}-${index}`} className={`${className} overflow-hidden rounded-2xl bg-muted shadow-sm`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={listing.image} alt={listing.title} className="h-full w-full object-cover" />
+                  <img src={image} alt={title} className="h-full w-full object-cover" />
                 </div>
               ))}
             </div>
-            {/* <div className="absolute bottom-10 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3 shadow-lg">
-              <div className="flex -space-x-2">
-                {["RA", "MK", "SV"].map((name) => (
-                  <span key={name} className="grid h-8 w-8 place-items-center rounded-full border-2 border-white bg-primary-100 text-[10px] font-bold text-primary-700">
-                    {name}
-                  </span>
-                ))}
-              </div>
-              <div>
-                <p className="text-xs font-semibold">Trusted by</p>
-                <p className="text-xs text-muted-foreground">Thousands</p>
-              </div>
-            </div> */}
           </div>
         </div>
       </section>

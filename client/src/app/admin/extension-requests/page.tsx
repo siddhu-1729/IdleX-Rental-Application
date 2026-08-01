@@ -1,5 +1,9 @@
-import { AdminSectionPage } from "@/components/marketplace/admin-pages";
+import { AdminGate, AdminSectionPage } from "@/components/marketplace/admin-pages";
 
 export default function AdminExtensionRequestsPage() {
-  return <AdminSectionPage title="Extension Requests" description="Review renter requests to extend active bookings before return deadlines." />;
+  return (
+    <AdminGate>
+      <AdminSectionPage title="Extension Requests" description="Track rental extension requests across all bookings." />
+    </AdminGate>
+  );
 }
