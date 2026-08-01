@@ -1,0 +1,60 @@
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+// Single user collection for Owner/Renter/Admin — matches the Django doc's
+// choice not to split into separate tables. `role` plus boolean flags gate
+// behaviour; admin is just role: 'admin'.
+const userSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    phone: { type: String, trim: true },
+    password: { type: String, required: true, select: false },
+
+    role: {
+      type: String,
+      enum: ['renter', 'owner', 'admin'],
+      default: 'renter',
+    },
+    // A user can act as both owner and renter without a role switch;
+    // `role` covers admin vs regular, these flags cover the dual capability.
+    isOwner: { type: Boolean, default: false },
+    isRenter: { type: Boolean, default: true },
+
+    isPhoneVerified: { type: Boolean, default: false },
+    isEmailVerified: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true }, // false = suspended by admin
+
+    avatarUrl: { type: String, default: null },
+
+    otp: {
+      code: { type: String, select: false },
+      expiresAt: { type: Date, select: false },
+    },
+
+    passwordResetToken: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
+  },
+  { timestamps: true }
+);
+
+userSchema.pre('save', async function hashPassword(next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+userSchema.methods.comparePassword = function comparePassword(candidate) {
+  return bcrypt.compare(candidate, this.password);
+};
+
+userSchema.methods.toSafeJSON = function toSafeJSON() {
+  const obj = this.toObject();
+  delete obj.password;
+  delete obj.otp;
+  delete obj.passwordResetToken;
+  delete obj.passwordResetExpires;
+  return obj;
+};
+
+module.exports = mongoose.model('User', userSchema);

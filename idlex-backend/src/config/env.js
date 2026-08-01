@@ -1,0 +1,41 @@
+require('dotenv').config();
+
+// Centralised, validated access to environment variables.
+// Every other module reads config from here instead of calling
+// process.env directly, so there's exactly one place that knows
+// what variables exist and what their defaults are.
+const env = {
+  nodeEnv: process.env.NODE_ENV || 'development',
+  port: parseInt(process.env.PORT || '5000', 10),
+  clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
+
+  mongoUri: process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/idlex',
+
+  jwt: {
+    accessSecret: process.env.JWT_ACCESS_SECRET,
+    refreshSecret: process.env.JWT_REFRESH_SECRET,
+    accessExpires: process.env.JWT_ACCESS_EXPIRES || '15m',
+    refreshExpires: process.env.JWT_REFRESH_EXPIRES || '7d',
+  },
+
+  twilio: {
+    accountSid: process.env.TWILIO_ACCOUNT_SID,
+    authToken: process.env.TWILIO_AUTH_TOKEN,
+    fromNumber: process.env.TWILIO_FROM_NUMBER,
+  },
+
+  uploadDir: process.env.UPLOAD_DIR || 'uploads',
+
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID,
+    keySecret: process.env.RAZORPAY_KEY_SECRET,
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+  },
+
+  admin: {
+    email: process.env.ADMIN_EMAIL || 'admin@idlex.com',
+    password: process.env.ADMIN_PASSWORD || 'admin12345',
+  },
+};
+
+module.exports = env;

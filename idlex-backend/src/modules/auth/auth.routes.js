@@ -1,0 +1,27 @@
+const express = require('express');
+const controller = require('./auth.controller');
+const validate = require('../../middlewares/validate.middleware');
+const { protect } = require('../../middlewares/auth.middleware');
+const {
+  registerSchema,
+  loginSchema,
+  otpRequestSchema,
+  otpVerifySchema,
+  passwordResetRequestSchema,
+  passwordResetConfirmSchema,
+  updateMeSchema,
+} = require('./auth.validation');
+
+const router = express.Router();
+
+router.post('/register', validate(registerSchema), controller.register);
+router.post('/login', validate(loginSchema), controller.login);
+router.post('/token/refresh', controller.refreshToken);
+router.post('/otp/request', validate(otpRequestSchema), controller.requestOtp);
+router.post('/otp/verify', validate(otpVerifySchema), controller.verifyOtp);
+router.post('/password/reset', validate(passwordResetRequestSchema), controller.requestPasswordReset);
+router.post('/password/reset/confirm', validate(passwordResetConfirmSchema), controller.confirmPasswordReset);
+router.get('/me', protect, controller.me);
+router.patch('/me', protect, validate(updateMeSchema), controller.updateMe);
+
+module.exports = router;
