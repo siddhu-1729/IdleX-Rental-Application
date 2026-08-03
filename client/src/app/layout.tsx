@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AuthProvider } from "@/lib/auth";
+import { AuthProvider, RouteGuard } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "IdleX - Rent Smart. Own Nothing. Live Fully.",
@@ -16,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-background text-foreground select-none">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <RouteGuard>{children}</RouteGuard>
+        </AuthProvider>
       </body>
     </html>
   );

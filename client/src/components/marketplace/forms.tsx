@@ -13,7 +13,7 @@ import { api, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import type { Kyc, Listing, User } from "@/lib/api-types";
 import { ROUTES } from "@/lib/constants";
-import { errorMessage } from "@/lib/auth";
+import { errorMessage, isNetworkError } from "@/lib/auth";
 
 function FieldError({ message }: { message: string | null }) {
   if (!message) return null;
@@ -31,6 +31,7 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
+  const [offline, setOffline] = React.useState(false);
 
   const titles = {
     login: "Welcome back",
@@ -39,18 +40,28 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
     otp: "Verify your phone",
   };
 
+  const redirectAfterAuth = (user?: { role?: string }) => {
+    const next = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("next");
+    if (next && next.startsWith("/")) {
+      router.replace(next);
+      return;
+    }
+    router.replace(user?.role === "admin" ? ROUTES.ADMIN : ROUTES.HOME);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setNotice(null);
+    setOffline(false);
     setLoading(true);
     try {
       if (mode === "login") {
         const user = await login(email.trim(), password);
-        router.push(user.role === "admin" ? ROUTES.ADMIN : ROUTES.DASHBOARD);
+        redirectAfterAuth(user);
       } else if (mode === "sign-up") {
-        await register({ name, email: email.trim(), phone: phone.trim(), password });
-        router.push(ROUTES.DASHBOARD);
+        const user = await register({ name, email: email.trim(), phone: phone.trim(), password });
+        redirectAfterAuth(user);
       } else if (mode === "forgot") {
         await api.post<null>("/api/auth/password/reset", { email: email.trim() });
         setNotice("If that email exists, a reset link has been sent.");
@@ -65,6 +76,7 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
       }
     } catch (err) {
       setError(errorMessage(err));
+      if (isNetworkError(err)) setOffline(true);
     } finally {
       setLoading(false);
     }
@@ -96,6 +108,12 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
         )}
         <FieldError message={error} />
         {notice && <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">{notice}</p>}
+        {mode === "login" && offline && (
+          <p className="rounded-md bg-primary-50 p-3 text-sm text-primary-700">
+            Backend is offline, using the built-in demo mode. Try{" "}
+            <strong>demo@idlex.com</strong> / <strong>demo1234</strong> or create a new account.
+          </p>
+        )}
         <Button fullWidth loading={loading}>
           {mode === "forgot" ? "Send reset link" : mode === "otp" ? (code ? "Verify OTP" : "Send OTP") : "Continue"}
         </Button>

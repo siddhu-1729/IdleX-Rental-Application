@@ -73,6 +73,15 @@ export const BOOKING_STATUS = {
 } as const;
 export type BookingStatus = (typeof BOOKING_STATUS)[keyof typeof BOOKING_STATUS];
 
+/**
+ * Routes visible without logging in: the home page and the auth pages.
+ * Every other page is protected by RouteGuard and requires a logged-in user.
+ */
+export const PUBLIC_ROUTES = ["/", "/login", "/register", "/sign-up", "/forgot-password", "/verify-otp"] as const;
+
+/** Auth pages a signed-in user should be redirected away from. */
+export const AUTH_PAGES = ["/login", "/register", "/sign-up", "/forgot-password", "/verify-otp"] as const;
+
 export const KYC_STATUS = {
   NOT_STARTED: "not_started",
   IN_PROGRESS: "in_progress",

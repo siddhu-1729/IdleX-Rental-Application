@@ -51,6 +51,18 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (name.trim().length < 2) {
+      setError("Full name must be at least 2 characters");
+      return;
+    }
+    if (phone.trim().length < 7) {
+      setError("Phone number must be at least 7 digits");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -58,7 +70,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const user = await register({ name, email, phone, password, becomeOwner: role === "owner" });
-      router.push(user.role === "admin" ? ROUTES.ADMIN : ROUTES.DASHBOARD);
+      router.push(user.role === "admin" ? ROUTES.ADMIN : ROUTES.HOME);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -181,8 +193,8 @@ export default function RegisterPage() {
               </div>
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <Input label="Full name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Venkata Siddhardha" required />
-                <Input label="Phone number" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" required />
+                <Input label="Full name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Venkata Siddhardha" minLength={2} required />
+                <Input label="Phone number" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" minLength={7} required />
                 <Input label="Email address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="siddhu@example.com" required />
                 <Select
                   label="City"
@@ -195,8 +207,8 @@ export default function RegisterPage() {
                     { value: "eluru", label: "Eluru" },
                   ]}
                 />
-                <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create password" required />
-                <Input label="Confirm password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat password" required />
+                <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create password" minLength={8} hint="At least 8 characters" required />
+                <Input label="Confirm password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat password" minLength={8} required />
               </div>
 
               <input type="hidden" name="role" value={role} />

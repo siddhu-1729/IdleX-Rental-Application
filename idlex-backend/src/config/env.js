@@ -12,8 +12,9 @@ const env = {
   mongoUri: process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/idlex',
 
   jwt: {
-    accessSecret: process.env.JWT_ACCESS_SECRET,
-    refreshSecret: process.env.JWT_REFRESH_SECRET,
+    // Dev defaults only — set real secrets via .env in production.
+    accessSecret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret_9f8a7c6b5e4d3c2b1a',
+    refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret_1a2b3c4d5e6f7a8b9c',
     accessExpires: process.env.JWT_ACCESS_EXPIRES || '15m',
     refreshExpires: process.env.JWT_REFRESH_EXPIRES || '7d',
   },
