@@ -241,12 +241,27 @@ export function useErrorMessage(error: Error | null): string {
 }
 
 /**
+ * True only after the component has hydrated. Auth state is restored from
+ * localStorage during hydration, so anything user-dependent must wait for
+ * the client to mount — otherwise SSR renders the loading state while the
+ * client hydrates the real page, and React throws a hydration mismatch.
+ */
+export function useIsMounted(): boolean {
+  return React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+}
+
+/**
  * Client-side auth guard. Renders children once a user is loaded; if no
  * token exists it redirects to /login and shows a loading placeholder.
  */
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, refreshUser } = useAuth();
   const router = useRouter();
+  const mounted = useIsMounted();
 
   React.useEffect(() => {
     if (getStoredUser<User>() && !user && !isMockSession()) {
@@ -256,10 +271,10 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   }, []);
 
   React.useEffect(() => {
-    if (!user) router.replace(ROUTES.LOGIN);
-  }, [user, router]);
+    if (mounted && !user) router.replace(ROUTES.LOGIN);
+  }, [user, router, mounted]);
 
-  if (!user) {
+  if (!mounted || !user) {
     return (
       <div className="grid min-h-screen place-items-center bg-muted">
         <p className="text-sm text-muted-foreground">Loading…</p>
@@ -279,24 +294,25 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const mounted = useIsMounted();
 
   const isPublic = PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
   const isAuthPage = AUTH_PAGES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
   React.useEffect(() => {
     if (isPublic) return;
-    if (!user) {
+    if (mounted && !user) {
       router.replace(`${ROUTES.LOGIN}?next=${encodeURIComponent(pathname)}`);
     }
-  }, [pathname, user, isPublic, router]);
+  }, [pathname, user, isPublic, mounted, router]);
 
   React.useEffect(() => {
-    if (user && isAuthPage) {
+    if (mounted && user && isAuthPage) {
       router.replace(ROUTES.HOME);
     }
-  }, [user, isAuthPage, router]);
+  }, [user, isAuthPage, mounted, router]);
 
-  if (!user && !isPublic) {
+  if (!isPublic && (!mounted || !user)) {
     return (
       <div className="grid min-h-screen place-items-center bg-muted">
         <p className="text-sm text-muted-foreground">Loading…</p>

@@ -77,7 +77,7 @@ function ThreadInner({ conversationId }: { conversationId: string }) {
 
   return (
     <DashboardShell title="Conversation">
-      <div className="flex min-h-[620px] flex-col rounded-lg border border-border bg-card">
+      <div className="flex min-h-155 flex-col rounded-lg border border-border bg-card">
         <div className="border-b border-border p-4">
           <h1 className="font-semibold">{otherName}</h1>
           {conversation?.listing && typeof conversation.listing === "object" && (

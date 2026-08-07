@@ -14,8 +14,8 @@ const createReview = asyncHandler(async (req, res) => {
   if (booking.renter.toString() !== req.user._id.toString()) {
     throw ApiError.forbidden('Only the renter on this booking can leave a review');
   }
-  if (booking.status !== 'completed') {
-    throw ApiError.badRequest('Can only review a completed booking');
+  if (booking.status !== 'completed' && booking.status !== 'return_requested') {
+    throw ApiError.badRequest('Can only review a completed booking or one where a return is in progress');
   }
 
   const review = await Review.create({
@@ -53,4 +53,13 @@ const listListingReviews = asyncHandler(async (req, res) => {
   return new ApiResponse(200, reviews, 'Listing reviews').send(res);
 });
 
-module.exports = { createReview, listListingReviews };
+// Reviews created by the signed-in user — lets the app mark which
+// bookings have already been reviewed.
+const myReviews = asyncHandler(async (req, res) => {
+  const reviews = await Review.find({ reviewer: req.user._id })
+    .sort('-createdAt')
+    .populate('listing', 'title _id');
+  return new ApiResponse(200, reviews, 'My reviews').send(res);
+});
+
+module.exports = { createReview, listListingReviews, myReviews };

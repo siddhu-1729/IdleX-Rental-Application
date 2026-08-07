@@ -3,6 +3,8 @@
 import * as React from "react";
 import { DashboardShell } from "@/components/marketplace/dashboard-shell";
 import { RentalExtensionPanel } from "@/components/marketplace/rental-extension-panel";
+import { ReviewModal } from "@/components/marketplace/review-modal";
+import type { ReviewTarget } from "@/components/marketplace/review-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RequireAuth, useAuth, errorMessage } from "@/lib/auth";
@@ -16,6 +18,8 @@ function RentalDetailInner({ rentalId }: { rentalId: string }) {
   const { data: booking, isLoading, error, refetch } = useFetchData<Booking>(`/api/bookings/${rentalId}`, [rentalId]);
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
+  const [reviewTarget, setReviewTarget] = React.useState<ReviewTarget | null>(null);
+  const [reviewed, setReviewed] = React.useState(false);
 
   const confirm = async () => {
     setBusy(true);
@@ -50,6 +54,35 @@ function RentalDetailInner({ rentalId }: { rentalId: string }) {
   const isOwner = booking.owner && (typeof booking.owner === "object" ? booking.owner._id : booking.owner) === user?._id;
   const isRenter = booking.renter && (typeof booking.renter === "object" ? booking.renter._id : booking.renter) === user?._id;
   const pendingExt = booking.extensionRequests?.find((r) => r.status === "pending");
+  const canReview = isRenter && ["completed", "return_requested"].includes(booking.status) && !reviewed;
+  const canRequestReturn = isRenter && ["confirmed", "active"].includes(booking.status);
+  const canConfirmReturn = isOwner && booking.status === "return_requested";
+
+  const requestReturn = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await api.post<Booking>(`/api/bookings/${rentalId}/request-return`, {});
+      refetch();
+    } catch (err) {
+      setMessage(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmReturn = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await api.post<Booking>(`/api/bookings/${rentalId}/confirm-return`, {});
+      refetch();
+    } catch (err) {
+      setMessage(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const extension = {
     available: Boolean(isRenter && ["confirmed", "active"].includes(booking.status)),
@@ -66,10 +99,28 @@ function RentalDetailInner({ rentalId }: { rentalId: string }) {
         {message && <p className="rounded-md bg-danger-50 p-3 text-sm text-danger">{message}</p>}
         <div className="rounded-lg border border-border bg-card p-6">
           <div className="flex items-center justify-between gap-3">
-            <Badge variant={booking.status === "completed" ? "success" : booking.status === "cancelled" ? "danger" : "default"}>{booking.status}</Badge>
-            {isOwner && booking.status === "requested" && (
-              <Button size="sm" loading={busy} onClick={confirm}>Confirm Booking</Button>
-            )}
+            <Badge variant={booking.status === "completed" ? "success" : booking.status === "cancelled" ? "danger" : booking.status === "return_requested" ? "warning" : "default"}>{booking.status}</Badge>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {isOwner && booking.status === "requested" && (
+                <Button size="sm" loading={busy} onClick={confirm}>Confirm Booking</Button>
+              )}
+              {canRequestReturn && (
+                <Button size="sm" variant="outline" loading={busy} onClick={requestReturn}>
+                  Request Return
+                </Button>
+              )}
+              {canConfirmReturn && (
+                <Button size="sm" loading={busy} onClick={confirmReturn}>Confirm Return</Button>
+              )}
+              {canReview && (
+                <Button size="sm" variant="outline" onClick={() => setReviewTarget({ _id: booking._id, title })}>
+                  Leave a Review
+                </Button>
+              )}
+              {isRenter && booking.status === "completed" && reviewed && (
+                <Badge variant="success">Reviewed</Badge>
+              )}
+            </div>
           </div>
           <h1 className="mt-3 text-2xl font-bold">{title}</h1>
           <p className="mt-2 text-muted-foreground">{formatDate(booking.startDate)} - {formatDate(booking.endDate)}</p>
@@ -113,6 +164,12 @@ function RentalDetailInner({ rentalId }: { rentalId: string }) {
         </div>
         {isRenter && <RentalExtensionPanel extension={extension} bookingId={rentalId} />}
       </div>
+      <ReviewModal
+        open={!!reviewTarget}
+        onClose={() => setReviewTarget(null)}
+        booking={reviewTarget}
+        onSubmitted={() => setReviewed(true)}
+      />
     </DashboardShell>
   );
 }

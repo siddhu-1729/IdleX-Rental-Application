@@ -6,31 +6,48 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
-  Bell, MessageCircle, Search, MapPin, Menu, X, User, LogOut, Settings, ChevronDown, LayoutDashboard,
+  Bell, MessageCircle, Search, MapPin, Menu, X, User, LogOut, Settings, ChevronDown, LayoutDashboard, Home, Heart,
 } from "@/components/ui/icons";
 import { PUBLIC_NAV } from "@/config/site";
 import { ROUTES } from "@/lib/constants";
 import { useAuth } from "@/lib/auth";
 import { getToken } from "@/lib/api-client";
+import { useHostStatus } from "@/lib/use-host-status";
 
 export function Navbar() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { hasListings } = useHostStatus();
   const [open, setOpen] = React.useState(false);
   const [menu, setMenu] = React.useState(false);
-  const signedIn = !!user || !!getToken();
+
+  // localStorage is not available during SSR, so the auth state can only
+  // be trusted after mount — avoids a hydration mismatch on public pages.
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+  const signedIn = mounted && (!!user || !!getToken());
+  const isHost = mounted && signedIn && hasListings;
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-border">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 h-16 flex items-center gap-4">
         {/* Logo */}
-        <Link href={ROUTES.HOME} className="flex items-center gap-2">
+        
           <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center text-white font-bold text-sm">
             iX
           </div>
           <span className="text-lg font-bold text-foreground tracking-tight">
             Idle<span className="text-primary">X</span>
           </span>
+       
+
+        {/* Home (desktop) */}
+        <Link href={ROUTES.HOME} className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+          <Home size={16} />
+          Home
         </Link>
 
         {/* Location (desktop) */}
@@ -65,8 +82,8 @@ export function Navbar() {
               </Link>
             </>
           )}
-          <Link href={ROUTES.BECOME_HOST} className="hidden md:inline-flex">
-            <Button variant="primary" size="sm">Become a Host</Button>
+          <Link href={isHost ? ROUTES.LISTING_NEW : ROUTES.BECOME_HOST} className="hidden md:inline-flex">
+            <Button variant="primary" size="sm">{isHost ? "Add another listing" : "Become a Host"}</Button>
           </Link>
 
           {/* User menu */}
@@ -89,6 +106,7 @@ export function Navbar() {
                     <p className="text-xs text-muted-foreground">{user?.email}</p>
                   </div>
                   <MenuLink href={ROUTES.DASHBOARD} icon={<LayoutDashboard size={16} />}>Dashboard</MenuLink>
+                  <MenuLink href={ROUTES.WISHLIST} icon={<Heart size={16} />}>Wishlist</MenuLink>
                   <MenuLink href={ROUTES.MY_LISTINGS} icon={<Settings size={16} />}>My Listings</MenuLink>
                   <MenuLink href={ROUTES.MY_RENTALS} icon={<User size={16} />}>My Bookings</MenuLink>
                   <MenuLink href={ROUTES.PROFILE} icon={<User size={16} />}>Profile</MenuLink>
@@ -132,6 +150,13 @@ export function Navbar() {
               className="w-full h-10 pl-10 pr-4 rounded-lg border border-border text-sm"
             />
           </form>
+          <Link
+            href={ROUTES.HOME}
+            className="flex items-center gap-2 px-3 py-2 text-sm rounded-md text-foreground hover:bg-muted"
+          >
+            <span className="text-muted-foreground"><Home size={16} /></span>
+            Home
+          </Link>
           {PUBLIC_NAV.map((item) => (
             <Link
               key={item.label}

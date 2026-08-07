@@ -2,12 +2,21 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Search, Bell, MessageCircle, Menu } from "@/components/ui/icons";
+import { Search, Bell, MessageCircle, Menu, Home } from "@/components/ui/icons";
 import { Avatar } from "@/components/ui/avatar";
+import { useAuth } from "@/lib/auth";
+import { useFetchData } from "@/lib/use-fetch-data";
+import { ROUTES } from "@/lib/constants";
 
 export function TopBar({ onMenuClick, title }: { onMenuClick?: () => void; title?: string }) {
+  const { user } = useAuth();
+  const { data: unread } = useFetchData<{ count: number }>("/api/notifications/unread-count", []);
+  const unreadCount = unread?.count ?? 0;
   return (
     <div className="sticky top-0 z-20 h-16 bg-white border-b border-border px-4 md:px-6 flex items-center gap-3">
+      <Link href={ROUTES.HOME} title="Home" className="h-10 w-10 inline-flex items-center justify-center rounded-md hover:bg-muted">
+        <Home size={20} />
+      </Link>
       {onMenuClick && (
         <button onClick={onMenuClick} className="md:hidden h-10 w-10 inline-flex items-center justify-center rounded-md hover:bg-muted">
           <Menu size={20} />
@@ -29,14 +38,17 @@ export function TopBar({ onMenuClick, title }: { onMenuClick?: () => void; title
       <div className="ml-auto flex items-center gap-1">
         <Link href="/messages" className="relative h-10 w-10 inline-flex items-center justify-center rounded-full hover:bg-muted">
           <MessageCircle size={20} />
-          <span className="absolute top-1.5 right-1.5 h-4 min-w-4 px-1 text-[10px] font-bold rounded-full bg-danger text-white flex items-center justify-center">2</span>
         </Link>
         <Link href="/notifications" className="relative h-10 w-10 inline-flex items-center justify-center rounded-full hover:bg-muted">
           <Bell size={20} />
-          <span className="absolute top-1.5 right-1.5 h-4 min-w-4 px-1 text-[10px] font-bold rounded-full bg-danger text-white flex items-center justify-center">3</span>
+          {unreadCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 h-4 min-w-4 px-1 text-[10px] font-bold rounded-full bg-danger text-white flex items-center justify-center">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
         </Link>
         <div className="ml-2">
-          <Avatar name="Rahul Verma" size="sm" />
+          <Avatar name={user?.name ?? "User"} src={user?.avatarUrl ?? undefined} size="sm" />
         </div>
       </div>
     </div>

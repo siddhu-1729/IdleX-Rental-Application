@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -11,16 +11,18 @@ import { LogOut, X } from "@/components/ui/icons";
 import { ICONS } from "@/components/ui/icons";
 import { RENTER_SIDEBAR, OWNER_SIDEBAR } from "@/config/navigation";
 import { ROUTES } from "@/lib/constants";
+import { useAuth } from "@/lib/auth";
 
 export function DashboardSidebar({
-  mode = "renter",
   onCloseMobile,
 }: {
-  mode?: "renter" | "owner";
   onCloseMobile?: () => void;
 }) {
   const pathname = usePathname();
-  const items = mode === "owner" ? OWNER_SIDEBAR : RENTER_SIDEBAR;
+  const router = useRouter();
+  const { user, logout } = useAuth();
+  const isOwner = user?.isOwner || user?.role === "owner" || user?.role === "admin";
+  const items = isOwner ? OWNER_SIDEBAR : RENTER_SIDEBAR;
 
   return (
     <aside className="h-full flex flex-col bg-white border-r border-border w-64">
@@ -44,16 +46,15 @@ export function DashboardSidebar({
       {/* User card */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <Avatar name="Rahul Verma" size="md" />
+          <Avatar name={user?.name ?? "User"} src={user?.avatarUrl ?? undefined} size="md" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate">Rahul Verma</p>
-            <p className="text-xs text-muted-foreground">{mode === "owner" ? "Owner" : "Renter"}</p>
+            <p className="text-sm font-semibold truncate">{user?.name ?? "User"}</p>
+            <p className="text-xs text-muted-foreground truncate">{user?.email ?? ""}</p>
           </div>
         </div>
         <div className="mt-2 flex items-center gap-1">
-          <span className="text-xs">★</span>
-          <span className="text-xs font-semibold">4.7</span>
-          <span className="text-xs text-muted-foreground">(23 Reviews)</span>
+          {user?.isEmailVerified && <Badge variant="success" className="text-[10px]">Email verified</Badge>}
+          {isOwner && <Badge className="text-[10px]">Owner</Badge>}
         </div>
       </div>
 
@@ -97,24 +98,19 @@ export function DashboardSidebar({
         })}
       </nav>
 
-      {/* Refer & Earn */}
-      <div className="m-3 p-4 rounded-xl bg-linear-to-br from-primary-50 to-secondary-50 border border-primary-100">
-        <p className="text-sm font-semibold text-foreground">Refer & Earn</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Refer your friends and earn ₹300 IdleX credits!
-        </p>
-        <Button size="sm" className="mt-3 w-full">Refer Now</Button>
-      </div>
-
       {/* Logout */}
       <div className="p-3 border-t border-border">
-        <Link
-          href={ROUTES.LOGIN}
-          className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-muted"
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-3 px-3 py-2 text-sm text-foreground hover:bg-muted"
+          onClick={() => {
+            logout();
+            router.push(ROUTES.LOGIN);
+          }}
         >
           <LogOut size={18} />
           Logout
-        </Link>
+        </Button>
       </div>
     </aside>
   );

@@ -139,7 +139,7 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
   );
 }
 
-export function ListingStepperForm({ edit = false }: { edit?: boolean }) {
+export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean; listingId?: string }) {
   const router = useRouter();
   const { user, refreshUser } = useAuth();
   const [title, setTitle] = React.useState("");
@@ -148,14 +148,77 @@ export function ListingStepperForm({ edit = false }: { edit?: boolean }) {
   const [securityDeposit, setSecurityDeposit] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [city, setCity] = React.useState("");
+  const [status, setStatus] = React.useState<"draft" | "published" | "paused">("draft");
+  const [selectedPhoto, setSelectedPhoto] = React.useState<{ id: number; file: File; url: string } | null>(null);
+  const nextPhotoId = React.useRef(0);
+  const [existingPhotos, setExistingPhotos] = React.useState<Listing["photos"]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [loadingListing, setLoadingListing] = React.useState(edit);
+
+  React.useEffect(() => {
+    if (!edit || !listingId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const listing = await api.get<Listing>(`/api/listings/${listingId}`);
+        if (cancelled) return;
+        setTitle(listing.title);
+        setCategory(listing.category);
+        setPricePerDay(String(listing.pricePerDay));
+        setSecurityDeposit(String(listing.securityDeposit ?? 0));
+        setDescription(listing.description);
+        setCity(listing.location?.city ?? "");
+        setStatus(listing.status);
+        setExistingPhotos(listing.photos ?? []);
+      } catch (err) {
+        if (!cancelled) setError(errorMessage(err));
+      } finally {
+        if (!cancelled) setLoadingListing(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [edit, listingId]);
+
+  const uploadPhotos = async (id: string) => {
+    if (!selectedPhoto) return;
+    const form = new FormData();
+    form.append("photos", selectedPhoto.file);
+    await api.post<Listing["photos"]>(`/api/listings/${id}/photos`, form, { headers: {} });
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (selectedPhoto) URL.revokeObjectURL(selectedPhoto.url);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const addPhoto = (file: File) => {
+    setSelectedPhoto((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return { id: nextPhotoId.current++, file, url: URL.createObjectURL(file) };
+    });
+  };
+
+  const removePhoto = () => {
+    setSelectedPhoto((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  };
 
   const submit = async (publish: boolean) => {
     setError(null);
+    if (!selectedPhoto && existingPhotos.length === 0) {
+      setError("Please add a photo of your item — it's required before saving.");
+      return;
+    }
     setLoading(true);
     try {
-      if (user && !user.isOwner) {
+      if (!edit && user && !user.isOwner) {
         const updated = await api.patch<User>("/api/auth/me", { becomeOwner: true });
         await refreshUser().catch(() => updated);
       }
@@ -166,9 +229,12 @@ export function ListingStepperForm({ edit = false }: { edit?: boolean }) {
         securityDeposit: Number(securityDeposit || 0),
         description,
         location: city ? { city } : undefined,
-        status: publish ? "published" : "draft",
+        status: publish ? ("published" as const) : status,
       };
-      await api.post<Listing>("/api/listings", payload);
+      const listing = edit && listingId
+        ? await api.put<Listing>(`/api/listings/${listingId}`, payload)
+        : await api.post<Listing>("/api/listings", payload);
+      await uploadPhotos(listing._id);
       router.push(ROUTES.MY_LISTINGS);
     } catch (err) {
       setError(errorMessage(err));
@@ -210,10 +276,60 @@ export function ListingStepperForm({ edit = false }: { edit?: boolean }) {
         <Input label="Security deposit" type="number" value={securityDeposit} onChange={(e) => setSecurityDeposit(e.target.value)} placeholder="1000" />
         <Input label="City" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Pune" />
         <Textarea className="md:col-span-2" label="Description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Condition, included accessories, pickup notes..." required />
-        <div className="flex min-h-36 items-center justify-center rounded-lg border border-dashed border-border bg-muted md:col-span-2">
-          <div className="text-center text-sm text-muted-foreground">
-            <Upload className="mx-auto mb-2" />
-            Photos can be uploaded after the listing is created.
+        <div className="md:col-span-2">
+          <label className="mb-2 block text-sm font-medium">Photos</label>
+          <div className="flex flex-wrap items-start gap-4">
+            <label className="inline-flex h-24 w-24 shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-border bg-muted px-3 text-center text-xs font-medium text-muted-foreground transition hover:border-primary hover:bg-primary-50 hover:text-primary">
+              <Upload size={18} className="mx-auto" />
+              <span>Upload</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (file) addPhoto(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+
+            {selectedPhoto ? (
+              <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={selectedPhoto.url} alt={selectedPhoto.file.name} className="max-h-80 w-full object-cover" />
+                <span className="absolute bottom-2 left-2 max-w-[calc(100%-5.5rem)] truncate rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white">
+                  {selectedPhoto.file.name}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Remove photo"
+                  onClick={removePhoto}
+                  className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border border-white/40 bg-black/60 text-sm font-semibold leading-none text-white transition hover:bg-danger"
+                >
+                  ×
+                </button>
+              </div>
+            ) : existingPhotos.length > 0 ? (
+              <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={existingPhotos[0].url} alt={existingPhotos[0].caption || "listing photo"} className="max-h-80 w-full object-cover" />
+                <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white">Current photo</span>
+              </div>
+            ) : (
+              <p className="self-center text-sm text-muted-foreground">
+                No photo yet. A photo is required to save your listing.
+              </p>
+            )}
+
+            {existingPhotos.length > 1 && (
+              <div className="flex w-full flex-wrap gap-2">
+                {existingPhotos.slice(1).map((p) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={p._id} src={p.url} alt={p.caption || "listing photo"} className="h-16 w-16 rounded-lg border border-border object-cover" />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -279,14 +395,18 @@ export function ListingStepperForm({ edit = false }: { edit?: boolean }) {
         </div>
       </div>
       <FieldError message={error} />
-      <div className="flex justify-end gap-3">
-        <Button variant="outline" loading={loading} onClick={() => submit(false)}>
-          Save Draft
-        </Button>
-        <Button loading={loading} onClick={() => submit(true)}>
-          {edit ? "Publish Changes" : "Publish Listing"}
-        </Button>
-      </div>
+      {loadingListing ? (
+        <p className="text-sm text-muted-foreground">Loading listing…</p>
+      ) : (
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" loading={loading} onClick={() => submit(false)}>
+            {edit ? "Save Changes" : "Save Draft"}
+          </Button>
+          <Button loading={loading} onClick={() => submit(true)}>
+            {edit ? "Publish Changes" : "Publish Listing"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -295,7 +415,9 @@ export function KycStepperForm() {
   const [kyc, setKyc] = React.useState<Kyc | null>(null);
   const [documentType, setDocumentType] = React.useState("aadhaar");
   const [idFile, setIdFile] = React.useState<File | null>(null);
+  const [idPreviewUrl, setIdPreviewUrl] = React.useState<string | null>(null);
   const [selfieFile, setSelfieFile] = React.useState<File | null>(null);
+  const [selfiePreviewUrl, setSelfiePreviewUrl] = React.useState<string | null>(null);
   const [accountHolderName, setAccountHolderName] = React.useState("");
   const [accountNumber, setAccountNumber] = React.useState("");
   const [ifscOrRoutingNumber, setIfscOrRoutingNumber] = React.useState("");
@@ -320,6 +442,26 @@ export function KycStepperForm() {
       cancelled = true;
     };
   }, []);
+
+  React.useEffect(() => {
+    return () => {
+      if (idPreviewUrl) URL.revokeObjectURL(idPreviewUrl);
+      if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const pickIdFile = (file: File | null) => {
+    if (idPreviewUrl) URL.revokeObjectURL(idPreviewUrl);
+    setIdFile(file);
+    setIdPreviewUrl(file ? URL.createObjectURL(file) : null);
+  };
+
+  const pickSelfieFile = (file: File | null) => {
+    if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
+    setSelfieFile(file);
+    setSelfiePreviewUrl(file ? URL.createObjectURL(file) : null);
+  };
 
   const uploadStep = async (step: "id-upload" | "selfie") => {
     const file = step === "id-upload" ? idFile : selfieFile;
@@ -402,14 +544,38 @@ export function KycStepperForm() {
           label="ID document (photo/PDF)"
           type="file"
           accept="image/*,.pdf"
-          onChange={(e) => setIdFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => pickIdFile(e.target.files?.[0] ?? null)}
         />
+        {idPreviewUrl && (
+          <div className="md:col-span-2 -mt-2">
+            <p className="mb-1 text-xs font-medium text-muted-foreground">Preview</p>
+            {idFile?.type.startsWith("image/") ? (
+              <div className="max-w-md overflow-hidden rounded-md border border-border bg-white shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={idPreviewUrl} alt={idFile?.name ?? "ID document"} className="max-h-72 w-full object-contain" />
+              </div>
+            ) : (
+              <div className="flex h-32 max-w-md items-center justify-center rounded-md border border-border bg-muted px-4 text-sm text-muted-foreground">
+                {idFile?.name ?? "Document"} (PDF)
+              </div>
+            )}
+          </div>
+        )}
         <Input
           label="Selfie photo"
           type="file"
           accept="image/*"
-          onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => pickSelfieFile(e.target.files?.[0] ?? null)}
         />
+        {selfiePreviewUrl && (
+          <div className="md:-mt-2">
+            <p className="mb-1 text-xs font-medium text-muted-foreground">Preview</p>
+            <div className="max-w-sm overflow-hidden rounded-md border border-border bg-white shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={selfiePreviewUrl} alt="Selfie" className="max-h-60 w-full object-contain" />
+            </div>
+          </div>
+        )}
         <Input label="Account holder" value={accountHolderName} onChange={(e) => setAccountHolderName(e.target.value)} placeholder="Name as on bank account" />
         <Input label="Account number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="Bank account number" />
         <Input label="IFSC" value={ifscOrRoutingNumber} onChange={(e) => setIfscOrRoutingNumber(e.target.value)} placeholder="HDFC0001234" />

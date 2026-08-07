@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, Td, Th } from "@/components/ui/data-table";
 import { api } from "@/lib/api-client";
-import { RequireAuth, useAuth, errorMessage } from "@/lib/auth";
+import { RequireAuth, useAuth, errorMessage, useIsMounted } from "@/lib/auth";
 import { useFetchData } from "@/lib/use-fetch-data";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import type { AdminStats, Dispute, Kyc, Listing, User } from "@/lib/api-types";
@@ -336,16 +336,20 @@ export function AdminSectionPage({ title, description }: { title: string; descri
 export function AdminGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user } = useAuth();
+  const mounted = useIsMounted();
   const bouncedRef = React.useRef(false);
 
   React.useEffect(() => {
     if (bouncedRef.current) return;
     bouncedRef.current = true;
-    if (!user) router.replace(ROUTES.LOGIN);
-    else if (user.role !== "admin") router.replace(ROUTES.DASHBOARD);
-  }, [user, router]);
+    if (!user) {
+      if (mounted) router.replace(ROUTES.LOGIN);
+    } else if (mounted && user.role !== "admin") {
+      router.replace(ROUTES.DASHBOARD);
+    }
+  }, [user, router, mounted]);
 
-  if (!user) {
+  if (!mounted || !user) {
     return <div className="grid min-h-screen place-items-center bg-muted"><p className="text-sm text-muted-foreground">Loading…</p></div>;
   }
   if (user.role !== "admin") {

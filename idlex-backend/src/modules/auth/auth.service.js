@@ -35,7 +35,7 @@ function issueTokens(user) {
 
 async function requestOtp(phone) {
   const code = generateOtp();
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+  const expiresAt = new Date(Date.now() + 50 * 60 * 1000); // 50 min
 
   await User.findOneAndUpdate(
     { phone },

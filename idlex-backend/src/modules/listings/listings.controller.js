@@ -23,7 +23,11 @@ const myListings = asyncHandler(async (req, res) => {
 });
 
 const createListing = asyncHandler(async (req, res) => {
-  const listing = await Listing.create({ ...req.body, owner: req.user._id, status: 'draft' });
+  const listing = await Listing.create({
+    ...req.body,
+    owner: req.user._id,
+    status: req.body.status ?? 'draft',
+  });
   return new ApiResponse(201, listing, 'Listing created').send(res);
 });
 

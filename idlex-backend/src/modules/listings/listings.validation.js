@@ -6,6 +6,7 @@ const createListingSchema = z.object({
   category: z.string().min(2),
   pricePerDay: z.coerce.number().positive(),
   securityDeposit: z.coerce.number().min(0).optional(),
+  status: z.enum(['draft', 'published', 'paused']).optional(),
   location: z
     .object({
       address: z.string().optional(),

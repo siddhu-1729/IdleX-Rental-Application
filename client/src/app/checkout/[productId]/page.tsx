@@ -37,8 +37,15 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
   const fee = Math.round(rent * 0.1);
   const total = rent + fee + listing.securityDeposit;
 
+  const ownerId = typeof listing.owner === "object" && listing.owner !== null ? listing.owner._id : listing.owner;
+  const isOwn = !!user && ownerId === user._id;
+
   const pay = async () => {
     setError(null);
+    if (isOwn) {
+      setError("You cannot book your own listing.");
+      return;
+    }
     if (!startDate || !endDate) {
       setError("Choose start and end dates");
       return;
@@ -91,7 +98,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
             <p className="flex justify-between text-base"><span>Total today</span><strong>{formatCurrency(total)}</strong></p>
             {error && <p className="rounded-md bg-danger-50 p-3 text-danger">{error}</p>}
             {done && <p className="rounded-md bg-secondary-50 p-3 text-secondary-700">Booking requested! The owner will confirm shortly.</p>}
-            <Button fullWidth loading={loading} onClick={pay}>Pay and Reserve</Button>
+            {isOwn && (
+              <p className="rounded-md border border-border bg-muted p-3 text-center text-sm text-muted-foreground">
+                This is your listing — you can&apos;t book your own items.
+              </p>
+            )}
+            <Button fullWidth loading={loading} disabled={isOwn} onClick={pay}>Pay and Reserve</Button>
             <Link href={`/product/${listing._id}`} className="block text-center text-sm font-semibold text-primary">Back to item</Link>
           </CardContent>
         </Card>

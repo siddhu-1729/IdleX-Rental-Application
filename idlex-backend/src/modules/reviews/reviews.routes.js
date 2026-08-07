@@ -4,6 +4,7 @@ const { protect } = require('../../middlewares/auth.middleware');
 
 const router = express.Router();
 
+router.get('/mine', protect, controller.myReviews);
 router.post('/', protect, controller.createReview);
 
 module.exports = router;

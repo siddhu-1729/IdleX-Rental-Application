@@ -77,6 +77,7 @@ export type BookingStatus =
   | "requested"
   | "confirmed"
   | "active"
+  | "return_requested"
   | "completed"
   | "cancelled"
   | "disputed";
@@ -214,10 +215,37 @@ export type AdminStats = {
   totalRevenue: number;
 };
 
+export type MarketplaceStats = {
+  activeListings: number;
+  happyRenters: number;
+  averageRating: number;
+};
+
 export type AuthResult = {
   user: User;
   accessToken: string;
   refreshToken: string;
+};
+
+export type AppNotificationType =
+  | "booking_request"
+  | "booking_confirmed"
+  | "booking_cancelled"
+  | "extension_requested"
+  | "return_requested"
+  | "return_confirmed"
+  | "info";
+
+export type AppNotification = {
+  _id: string;
+  recipient: string;
+  type: AppNotificationType;
+  title: string;
+  body: string;
+  link: string | null;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export function ownerName(owner: Listing["owner"]): string {

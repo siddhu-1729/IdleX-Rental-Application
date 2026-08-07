@@ -19,6 +19,9 @@ const chatRoutes = require('./modules/chat/chat.routes');
 const reviewsRoutes = require('./modules/reviews/reviews.routes');
 const reviewsController = require('./modules/reviews/reviews.controller');
 const adminRoutes = require('./modules/admin/admin.routes');
+const notificationsRoutes = require('./modules/notifications/notifications.routes');
+const statsRoutes = require('./modules/stats/stats.routes');
+const wishlistRoutes = require('./modules/wishlist/wishlist.routes');
 
 const app = express();
 
@@ -69,6 +72,9 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/stats', statsRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

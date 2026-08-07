@@ -27,6 +27,9 @@ const userSchema = new mongoose.Schema(
 
     avatarUrl: { type: String, default: null },
 
+    // Listings a user has saved to come back to later.
+    wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Listing', default: [] }],
+
     otp: {
       code: { type: String, select: false },
       expiresAt: { type: Date, select: false },

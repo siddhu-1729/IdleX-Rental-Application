@@ -19,6 +19,8 @@ router.get('/owner', controller.ownerBookings);
 router.get('/:id', controller.getBooking);
 router.post('/:id/confirm', controller.confirmBooking);
 router.post('/:id/cancel', validate(cancelBookingSchema), controller.cancelBooking);
+router.post('/:id/request-return', controller.requestReturn);
+router.post('/:id/confirm-return', controller.confirmReturn);
 router.post('/:id/extension-request', validate(extensionRequestSchema), controller.requestExtension);
 router.post('/:id/extension-request/:reqId/respond', validate(extensionRespondSchema), controller.respondExtension);
 

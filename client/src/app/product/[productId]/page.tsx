@@ -6,18 +6,47 @@ import { PublicShell } from "@/components/marketplace/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, ShieldCheck, Star } from "@/components/ui/icons";
+import { Heart, MapPin, ShieldCheck } from "@/components/ui/icons";
+import { StarRating } from "@/components/ui/star-rating";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { useFetchData } from "@/lib/use-fetch-data";
+import { useAuth, useIsMounted, errorMessage } from "@/lib/auth";
+import { api, getToken } from "@/lib/api-client";
 import { ownerName, listingImage } from "@/lib/api-types";
 import type { Listing, Review } from "@/lib/api-types";
 import { ROUTES } from "@/lib/constants";
 
 export default function ProductPage({ params }: { params: Promise<{ productId: string }> }) {
   const { productId } = React.use(params);
+  const { user } = useAuth();
+  const mounted = useIsMounted();
+  const signedIn = mounted && (!!user || !!getToken());
 
   const { data: listing, isLoading, error } = useFetchData<Listing>(`/api/listings/${productId}`, [productId]);
   const { data: reviews } = useFetchData<Review[]>(`/api/listings/${productId}/reviews`, [productId]);
+  const { data: wishlist, refetch: refetchWishlist } = useFetchData<Listing[]>(
+    signedIn ? "/api/wishlist" : null,
+    [productId, signedIn]
+  );
+  const [wishlistBusy, setWishlistBusy] = React.useState(false);
+  const [wishlistError, setWishlistError] = React.useState<string | null>(null);
+
+  const saved = signedIn && !!listing && (wishlist ?? []).some((l) => l._id === listing._id);
+
+  const toggleWishlist = async () => {
+    if (!listing) return;
+    setWishlistBusy(true);
+    setWishlistError(null);
+    try {
+      if (saved) await api.del(`/api/wishlist/${listing._id}`);
+      else await api.post(`/api/wishlist/${listing._id}`, {});
+      refetchWishlist();
+    } catch (err) {
+      setWishlistError(errorMessage(err));
+    } finally {
+      setWishlistBusy(false);
+    }
+  };
 
   if (isLoading) return <PublicShell><div className="grid min-h-[50vh] place-items-center text-sm text-muted-foreground">Loading…</div></PublicShell>;
   if (error || !listing) {
@@ -34,6 +63,8 @@ export default function ProductPage({ params }: { params: Promise<{ productId: s
 
   const image = listingImage(listing);
   const owner = ownerName(listing.owner);
+  const ownerId = typeof listing.owner === "object" && listing.owner !== null ? listing.owner._id : listing.owner;
+  const isOwn = mounted && !!user && ownerId === user._id;
 
   return (
     <PublicShell>
@@ -66,9 +97,7 @@ export default function ProductPage({ params }: { params: Promise<{ productId: s
                   <div key={review._id} className="rounded-lg border border-border bg-card p-4">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold">{typeof review.reviewer === "object" ? review.reviewer.name : "Renter"}</p>
-                      <span className="flex items-center gap-1 text-sm font-semibold text-accent-700">
-                        <Star size={14} /> {review.rating}
-                      </span>
+                      <StarRating value={review.rating} size={14} />
                       <span className="ml-auto text-xs text-muted-foreground">{formatDate(review.createdAt)}</span>
                     </div>
                     {review.comment && <p className="mt-2 text-sm text-muted-foreground">{review.comment}</p>}
@@ -81,9 +110,9 @@ export default function ProductPage({ params }: { params: Promise<{ productId: s
         <Card className="h-max">
           <CardHeader>
             <CardTitle>{formatCurrency(listing.pricePerDay)} / day</CardTitle>
-            <p className="flex items-center gap-1 text-sm text-accent-700">
-              <Star size={15} /> {listing.ratingAvg || "New"} {listing.ratingCount > 0 && `from ${listing.ratingCount} reviews`}
-            </p>
+            <div className="flex items-center gap-1 text-sm text-accent-700">
+              <StarRating value={listing.ratingAvg} size={15} /> {listing.ratingAvg || "New"} {listing.ratingCount > 0 && `from ${listing.ratingCount} reviews`}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg bg-muted p-4 text-sm">
@@ -94,7 +123,31 @@ export default function ProductPage({ params }: { params: Promise<{ productId: s
               <ShieldCheck size={18} />
               KYC verified owner and protected handover
             </div>
-            <Link href={ROUTES.CHECKOUT(listing._id)}><Button fullWidth>Reserve Item</Button></Link>
+            {isOwn ? (
+              <div className="rounded-lg border border-border bg-muted p-3 text-center text-sm text-muted-foreground">
+                This is your listing — you can&apos;t book your own items.
+              </div>
+            ) : (
+              <Link href={ROUTES.CHECKOUT(listing._id)}><Button fullWidth>Reserve Item</Button></Link>
+            )}
+            {signedIn && (
+              <>
+                <Button
+                  variant="outline"
+                  fullWidth
+                  loading={wishlistBusy}
+                  onClick={toggleWishlist}
+                  leftIcon={
+                    <Heart size={16} className={saved ? "fill-danger text-danger" : ""} />
+                  }
+                >
+                  {saved ? "Saved to Wishlist" : "Save to Wishlist"}
+                </Button>
+                {wishlistError && (
+                  <p className="rounded-md bg-danger-50 p-2 text-xs text-danger">{wishlistError}</p>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </section>

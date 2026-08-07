@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { categoryStats } from "@/lib/mock-data";
 import { useFetchData } from "@/lib/use-fetch-data";
 import { listingImage } from "@/lib/api-types";
-import type { ListingQueryResult } from "@/lib/api-types";
+import type { ListingQueryResult, MarketplaceStats } from "@/lib/api-types";
 import { ROUTES } from "@/lib/constants";
+import { useIsMounted } from "@/lib/auth";
+import { useHostStatus } from "@/lib/use-host-status";
 import {
   ArrowRight,
   Bike,
@@ -43,7 +45,11 @@ const categoryIcons = {
 };
 
 export default function Home() {
-  const { data } = useFetchData<ListingQueryResult>("/api/listings?status=published&limit=4", []);
+  const { data } = useFetchData<ListingQueryResult>("");
+  const { data: stats } = useFetchData<MarketplaceStats>("/api/stats");
+  const mounted = useIsMounted();
+  const { hasListings } = useHostStatus();
+  const isHost = mounted && hasListings;
 
   const tiles = [
     { className: "col-span-2 row-span-2", image: data?.items[0] ? listingImage(data.items[0]) : "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80", title: data?.items[0]?.title ?? "Camera kit" },
@@ -78,15 +84,15 @@ export default function Home() {
               <Link href={ROUTES.SEARCH}>
                 <Button size="lg" rightIcon={<ArrowRight size={18} />}>Browse Items</Button>
               </Link>
-              <Link href={ROUTES.BECOME_HOST}>
-                <Button size="lg" variant="outline">Become a Host</Button>
+              <Link href={isHost ? ROUTES.LISTING_NEW : ROUTES.BECOME_HOST}>
+                <Button size="lg" variant="outline">{isHost ? "Add another listing" : "Become a Host"}</Button>
               </Link>
             </div>
             <div className="mt-10 grid max-w-lg grid-cols-3 gap-5">
               {[
-                [`${(data?.pagination.total ?? 10000).toLocaleString("en-IN")}+`, "Active Listings"],
-                ["5K+", "Happy Renters"],
-                ["4.8", "Average Rating"],
+                [`${(stats?.activeListings ?? data?.pagination.total ?? 10000).toLocaleString("en-IN")}+`, "Active Listings"],
+                [`${(stats?.happyRenters ?? 5000).toLocaleString("en-IN")}+`, "Happy Renters"],
+                [stats?.averageRating ? stats.averageRating.toFixed(1) : "4.8", "Average Rating"],
               ].map(([value, label]) => (
                 <div key={label}>
                   <p className="text-2xl font-bold text-primary">{value}</p>

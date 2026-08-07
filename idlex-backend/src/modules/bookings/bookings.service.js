@@ -1,6 +1,7 @@
 const Listing = require('../../models/Listing');
 const Booking = require('../../models/Booking');
 const ApiError = require('../../utils/ApiError');
+const { notify } = require('../notifications/notifications.service');
 
 const SERVICE_FEE_RATE = 0.1; // 10% platform fee — same "plain business logic" note as the Django doc
 
@@ -38,6 +39,12 @@ async function assertDatesAvailable(listingId, startDate, endDate, excludeBookin
 async function createBooking(renterId, { listingId, startDate, endDate }) {
   const listing = await assertDatesAvailable(listingId, startDate, endDate);
 
+  // Owners cannot rent out their own items to themselves — a booking must
+  // be between two distinct users.
+  if (listing.owner.toString() === renterId.toString()) {
+    throw ApiError.forbidden('You cannot book your own listing');
+  }
+
   const totalDays = daysBetween(startDate, endDate);
   if (totalDays < 1) throw ApiError.badRequest('endDate must be after startDate');
 
@@ -59,7 +66,30 @@ async function createBooking(renterId, { listingId, startDate, endDate }) {
     totalAmount,
   });
 
+  // The owner who posted the item gets notified that a renter wants it.
+  const renter = await loadRenterName(renterId);
+  await notify(listing.owner, {
+    type: 'booking_request',
+    title: 'New booking request',
+    body: `${renter} wants to rent "${listing.title}" from ${formatDate(startDate)} to ${formatDate(endDate)}`,
+    link: '/dashboard?view=bookings',
+  });
+
   return booking;
+}
+
+async function loadRenterName(renterId) {
+  try {
+    const User = require('../../models/User');
+    const user = await User.findById(renterId).select('name');
+    return user ? user.name : 'A renter';
+  } catch {
+    return 'A renter';
+  }
+}
+
+function formatDate(date) {
+  return new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
 module.exports = { assertDatesAvailable, createBooking, daysBetween };
