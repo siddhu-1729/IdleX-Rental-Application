@@ -35,6 +35,14 @@ const userSchema = new mongoose.Schema(
       expiresAt: { type: Date, select: false },
     },
 
+    // Email OTP — shared by account verification and per-listing
+    // verification; `purpose` distinguishes the two flows.
+    emailOtp: {
+      code: { type: String, select: false },
+      expiresAt: { type: Date, select: false },
+      purpose: { type: String, enum: ['email_verify', 'listing'], select: false },
+    },
+
     passwordResetToken: { type: String, select: false },
     passwordResetExpires: { type: Date, select: false },
   },
@@ -55,6 +63,7 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
   const obj = this.toObject();
   delete obj.password;
   delete obj.otp;
+  delete obj.emailOtp;
   delete obj.passwordResetToken;
   delete obj.passwordResetExpires;
   return obj;

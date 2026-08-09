@@ -1,6 +1,8 @@
 const { z } = require('zod');
 
-const createListingSchema = z.object({
+// Shared listing fields. `otpCode` exists only on create — every listing
+// must be confirmed with an emailed OTP before it is saved.
+const listingFields = {
   title: z.string().min(3),
   description: z.string().min(10),
   category: z.string().min(2),
@@ -17,9 +19,14 @@ const createListingSchema = z.object({
       lng: z.coerce.number().optional(),
     })
     .optional(),
+};
+
+const createListingSchema = z.object({
+  ...listingFields,
+  otpCode: z.string().length(6),
 });
 
-const updateListingSchema = createListingSchema.partial();
+const updateListingSchema = z.object(listingFields).partial();
 
 const availabilitySchema = z.object({
   startDate: z.coerce.date(),

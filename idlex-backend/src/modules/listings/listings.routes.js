@@ -16,6 +16,9 @@ router.get('/:id/availability', controller.getAvailability);
 // Owner-only
 router.use(protect);
 router.get('/mine/all', controller.myListings); // -> maps to my-listings page
+// Sends the per-listing OTP. Authenticated users only (a renter creating
+// their first listing gets upgraded to owner right after this step).
+router.post('/otp/request', controller.requestListingOtp);
 router.post('/', authorize('owner', 'admin'), validate(createListingSchema), controller.createListing);
 router.put('/:id', authorize('owner', 'admin'), validate(updateListingSchema), controller.updateListing);
 router.patch('/:id', authorize('owner', 'admin'), validate(updateListingSchema), controller.updateListing);

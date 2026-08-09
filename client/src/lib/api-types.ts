@@ -117,7 +117,7 @@ export type PaymentStatus = "created" | "authorized" | "captured" | "failed" | "
 export type Payment = {
   _id: string;
   booking: string;
-  payer: string;
+  payer: string | Pick<User, "_id" | "name" | "email" | "avatarUrl">;
   gateway: string;
   gatewayOrderId: string;
   gatewayPaymentId: string | null;
@@ -213,6 +213,66 @@ export type AdminStats = {
   totalListings: number;
   activeBookings: number;
   totalRevenue: number;
+};
+
+export type Pagination = {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+};
+
+export type AuditLogCategory = "auth" | "listing" | "booking" | "payment" | "kyc" | "review" | "admin" | "system";
+
+export type AuditLog = {
+  _id: string;
+  actor: string | null | Pick<User, "_id" | "name" | "email" | "avatarUrl" | "role">;
+  action: string;
+  category: AuditLogCategory;
+  resourceType: string | null;
+  resourceId: string | null;
+  summary: string;
+  details: Record<string, unknown> | null;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+};
+
+export type AuditLogResult = {
+  items: AuditLog[];
+  pagination: Pagination;
+};
+
+export type SeriesPoint = {
+  date: string;
+  value: number;
+};
+
+export type AdminAnalytics = {
+  windowDays: number;
+  totals: AdminStats;
+  newSignups: SeriesPoint[];
+  revenueTrend: SeriesPoint[];
+  bookingTrend: SeriesPoint[];
+  bookingsByStatus: Array<{ status: string; count: number }>;
+  listingsByCategory: Array<{ category: string; count: number }>;
+  activityBreakdown: Array<{ action: string; count: number }>;
+  topUsers: Array<{
+    user: Pick<User, "_id" | "name" | "email" | "avatarUrl" | "isActive"> | null;
+    actions: number;
+    lastActive: string;
+  }>;
+  recentActivity: AuditLog[];
+};
+
+export type AdminBookingsResult = {
+  items: Booking[];
+  pagination: Pagination;
+};
+
+export type AdminPaymentsResult = {
+  items: Payment[];
+  pagination: Pagination;
 };
 
 export type MarketplaceStats = {

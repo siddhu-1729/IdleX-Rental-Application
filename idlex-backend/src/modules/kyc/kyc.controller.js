@@ -2,6 +2,7 @@ const asyncHandler = require('../../utils/asyncHandler');
 const ApiResponse = require('../../utils/ApiResponse');
 const ApiError = require('../../utils/ApiError');
 const Kyc = require('../../models/Kyc');
+const { logAudit } = require('../../utils/audit');
 
 const getMyKyc = asyncHandler(async (req, res) => {
   let kyc = await Kyc.findOne({ user: req.user._id });
@@ -39,6 +40,15 @@ const submitStep = asyncHandler(async (req, res) => {
 
   kyc.status = 'in_progress';
   await kyc.save();
+  logAudit({
+    actor: req.user._id,
+    action: 'kyc.step_saved',
+    category: 'kyc',
+    resourceType: 'kyc',
+    resourceId: kyc._id.toString(),
+    summary: `Saved KYC step '${step}'`,
+    req,
+  });
   return new ApiResponse(200, kyc, `Step '${step}' saved`).send(res);
 });
 
@@ -50,6 +60,15 @@ const finalizeSubmission = asyncHandler(async (req, res) => {
   }
   kyc.status = 'pending';
   await kyc.save();
+  logAudit({
+    actor: req.user._id,
+    action: 'kyc.submitted',
+    category: 'kyc',
+    resourceType: 'kyc',
+    resourceId: kyc._id.toString(),
+    summary: 'Submitted KYC for review',
+    req,
+  });
   return new ApiResponse(200, kyc, 'KYC submitted for review').send(res);
 });
 

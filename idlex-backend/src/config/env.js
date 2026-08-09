@@ -25,6 +25,17 @@ const env = {
     fromNumber: process.env.TWILIO_FROM_NUMBER,
   },
 
+  smtp: {
+    // Email delivery for OTPs. When SMTP_HOST is unset (local dev) the
+    // email util falls back to logging the message so flows still work.
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+    from: process.env.SMTP_FROM || 'IdleX <no-reply@idlex.app>',
+  },
+
   uploadDir: process.env.UPLOAD_DIR || 'uploads',
 
   razorpay: {
@@ -34,8 +45,9 @@ const env = {
   },
 
   admin: {
-    email: process.env.ADMIN_EMAIL || 'admin@idlex.com',
-    password: process.env.ADMIN_PASSWORD || 'admin12345',
+    // Default admin account — auto-seeded on server start (see utils/ensureDefaultAdmin.js).
+    email: process.env.ADMIN_EMAIL || 'admin@gmail.com',
+    password: process.env.ADMIN_PASSWORD || 'admin',
   },
 };
 

@@ -1,9 +1,9 @@
-import { AdminGate, AdminSectionPage } from "@/components/marketplace/admin-pages";
+import { AdminGate, AdminAuditLogsPage } from "@/components/marketplace/admin-pages";
 
-export default function AdminAuditLogsPage() {
+export default function AuditLogsAdminPage() {
   return (
     <AdminGate>
-      <AdminSectionPage title="Audit Logs" description="Review admin actions and system events." />
+      <AdminAuditLogsPage />
     </AdminGate>
   );
 }

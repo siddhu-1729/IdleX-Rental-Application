@@ -5,9 +5,20 @@ const Booking = require('../../models/Booking');
 const Listing = require('../../models/Listing');
 const bookingsService = require('./bookings.service');
 const { notify } = require('../notifications/notifications.service');
+const { logAudit } = require('../../utils/audit');
 
 const createBooking = asyncHandler(async (req, res) => {
   const booking = await bookingsService.createBooking(req.user._id, req.body);
+  logAudit({
+    actor: req.user._id,
+    action: 'booking.created',
+    category: 'booking',
+    resourceType: 'booking',
+    resourceId: booking._id.toString(),
+    summary: 'Requested a booking',
+    details: { listing: booking.listing, startDate: booking.startDate, endDate: booking.endDate, totalAmount: booking.totalAmount },
+    req,
+  });
   return new ApiResponse(201, booking, 'Booking requested').send(res);
 });
 
@@ -51,6 +62,15 @@ const confirmBooking = asyncHandler(async (req, res) => {
 
   booking.status = 'confirmed';
   await booking.save();
+  logAudit({
+    actor: req.user._id,
+    action: 'booking.confirmed',
+    category: 'booking',
+    resourceType: 'booking',
+    resourceId: booking._id.toString(),
+    summary: 'Confirmed a booking',
+    req,
+  });
 
   // Tell the renter their request was approved.
   const listing = await Listing.findById(booking.listing).select('title');
@@ -78,6 +98,16 @@ const cancelBooking = asyncHandler(async (req, res) => {
   booking.cancelledBy = req.user._id;
   booking.cancellationReason = req.body.reason;
   await booking.save();
+  logAudit({
+    actor: req.user._id,
+    action: 'booking.cancelled',
+    category: 'booking',
+    resourceType: 'booking',
+    resourceId: booking._id.toString(),
+    summary: 'Cancelled a booking',
+    details: { reason: req.body.reason },
+    req,
+  });
   return new ApiResponse(200, booking, 'Booking cancelled').send(res);
 });
 
@@ -96,6 +126,16 @@ const requestExtension = asyncHandler(async (req, res) => {
 
   booking.extensionRequests.push(req.body);
   await booking.save();
+  logAudit({
+    actor: req.user._id,
+    action: 'booking.extension_requested',
+    category: 'booking',
+    resourceType: 'booking',
+    resourceId: booking._id.toString(),
+    summary: 'Requested a rental extension',
+    details: { requestedNewEndDate: req.body.requestedNewEndDate },
+    req,
+  });
   return new ApiResponse(201, booking, 'Extension requested').send(res);
 });
 
@@ -119,6 +159,15 @@ const respondExtension = asyncHandler(async (req, res) => {
   }
 
   await booking.save();
+  logAudit({
+    actor: req.user._id,
+    action: 'booking.extension_responded',
+    category: 'booking',
+    resourceType: 'booking',
+    resourceId: booking._id.toString(),
+    summary: `${extension.status === 'approved' ? 'Approved' : 'Rejected'} an extension request`,
+    req,
+  });
   return new ApiResponse(200, booking, `Extension request ${extension.status}`).send(res);
 });
 
@@ -135,6 +184,15 @@ const requestReturn = asyncHandler(async (req, res) => {
 
   booking.status = 'return_requested';
   await booking.save();
+  logAudit({
+    actor: req.user._id,
+    action: 'booking.return_requested',
+    category: 'booking',
+    resourceType: 'booking',
+    resourceId: booking._id.toString(),
+    summary: 'Requested to return an item',
+    req,
+  });
 
   // The owner must acknowledge the received item.
   const listing = await Listing.findById(booking.listing).select('title');
@@ -161,6 +219,15 @@ const confirmReturn = asyncHandler(async (req, res) => {
 
   booking.status = 'completed';
   await booking.save();
+  logAudit({
+    actor: req.user._id,
+    action: 'booking.completed',
+    category: 'booking',
+    resourceType: 'booking',
+    resourceId: booking._id.toString(),
+    summary: 'Completed a booking',
+    req,
+  });
 
   // Tell the renter the item was received back — review step is next.
   const listing = await Listing.findById(booking.listing).select('title');

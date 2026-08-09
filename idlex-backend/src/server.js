@@ -5,9 +5,11 @@ const app = require('./app');
 const env = require('./config/env');
 const connectDB = require('./config/db');
 const registerChatSocket = require('./sockets/chat.socket');
+const ensureDefaultAdmin = require('./utils/ensureDefaultAdmin');
 
 async function start() {
   await connectDB();
+  await ensureDefaultAdmin().catch((err) => console.error('[admin] failed to seed default admin:', err.message));
 
   const server = http.createServer(app);
 

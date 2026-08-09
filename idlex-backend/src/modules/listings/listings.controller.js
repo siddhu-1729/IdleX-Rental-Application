@@ -3,6 +3,7 @@ const ApiResponse = require('../../utils/ApiResponse');
 const ApiError = require('../../utils/ApiError');
 const Listing = require('../../models/Listing');
 const listingsService = require('./listings.service');
+const { logAudit } = require('../../utils/audit');
 
 // GET /api/listings  — public, filtered. Query params double as the
 // "search" module from the Django doc (category, minPrice, ordering...).
@@ -22,25 +23,64 @@ const myListings = asyncHandler(async (req, res) => {
   return new ApiResponse(200, listings, "Owner's listings").send(res);
 });
 
+const requestListingOtp = asyncHandler(async (req, res) => {
+  await listingsService.createListingOtp(req.user);
+  return new ApiResponse(200, null, 'OTP sent to your email').send(res);
+});
+
 const createListing = asyncHandler(async (req, res) => {
+  // Every listing is gated by an emailed OTP — verify before writing.
+  await listingsService.assertValidListingOtp(req.user._id, req.body.otpCode);
+
+  const { otpCode, ...listingData } = req.body;
   const listing = await Listing.create({
-    ...req.body,
+    ...listingData,
     owner: req.user._id,
-    status: req.body.status ?? 'draft',
+    status: listingData.status ?? 'draft',
+  });
+  logAudit({
+    actor: req.user._id,
+    action: 'listing.created',
+    category: 'listing',
+    resourceType: 'listing',
+    resourceId: listing._id.toString(),
+    summary: `Created listing "${listing.title}"`,
+    details: { category: listing.category, pricePerDay: listing.pricePerDay, status: listing.status },
+    req,
   });
   return new ApiResponse(201, listing, 'Listing created').send(res);
 });
 
 const updateListing = asyncHandler(async (req, res) => {
   const listing = await listingsService.getOwnedListingOr404(req.params.id, req.user._id);
+  const changed = Object.keys(req.body);
   Object.assign(listing, req.body);
   await listing.save();
+  logAudit({
+    actor: req.user._id,
+    action: 'listing.updated',
+    category: 'listing',
+    resourceType: 'listing',
+    resourceId: listing._id.toString(),
+    summary: `Updated listing "${listing.title}"`,
+    details: { changed },
+    req,
+  });
   return new ApiResponse(200, listing, 'Listing updated').send(res);
 });
 
 const deleteListing = asyncHandler(async (req, res) => {
   const listing = await listingsService.getOwnedListingOr404(req.params.id, req.user._id);
   await listing.deleteOne();
+  logAudit({
+    actor: req.user._id,
+    action: 'listing.deleted',
+    category: 'listing',
+    resourceType: 'listing',
+    resourceId: listing._id.toString(),
+    summary: `Deleted listing "${listing.title}"`,
+    req,
+  });
   return new ApiResponse(200, null, 'Listing deleted').send(res);
 });
 
@@ -90,6 +130,7 @@ module.exports = {
   listListings,
   getListing,
   myListings,
+  requestListingOtp,
   createListing,
   updateListing,
   deleteListing,

@@ -37,7 +37,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <p className="text-xs font-semibold uppercase text-primary">Operations</p>
             <h1 className="text-lg font-semibold">Admin Control Center</h1>
           </div>
-          <Badge variant="success">Live mock data</Badge>
+          <Badge variant="success">Admin console</Badge>
         </header>
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</div>
       </main>

@@ -7,6 +7,8 @@ const Booking = require('../../models/Booking');
 const Payment = require('../../models/Payment');
 const Dispute = require('../../models/Dispute');
 const Kyc = require('../../models/Kyc');
+const AuditLog = require('../../models/AuditLog');
+const { logAudit } = require('../../utils/audit');
 
 // Dashboard numbers — Django's aggregation API equivalent via Mongo's
 // countDocuments / aggregate.
@@ -26,6 +28,188 @@ const getStats = asyncHandler(async (req, res) => {
   }, 'Dashboard stats').send(res);
 });
 
+// ---------------------------------------------------------------------------
+// Analytics — powers the graphical metrics on the admin dashboard
+// ---------------------------------------------------------------------------
+
+// Full list of ISO dates for the last `days` days, oldest first.
+function dayWindow(days) {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (days - 1));
+  const out = [];
+  for (let i = 0; i < days; i += 1) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+// Merge aggregation rows [{_id: 'YYYY-MM-DD', ...}] into a zero-filled series.
+function fillSeries(days, rows, field) {
+  const byDate = Object.fromEntries(rows.map((r) => [r._id, r[field]]));
+  return days.map((date) => ({ date, value: byDate[date] || 0 }));
+}
+
+const getAnalytics = asyncHandler(async (req, res) => {
+  const windowDays = Math.min(90, Math.max(7, Number(req.query.days) || 30));
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (windowDays - 1));
+
+  const dateKey = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
+
+  const [signupRows, revenueRows, bookingRows, bookingStatusRows, categoryRows, actionRows, topActorRows, recentLogs, totals] =
+    await Promise.all([
+      User.aggregate([{ $match: { createdAt: { $gte: start } } }, { $group: { _id: dateKey, count: { $sum: 1 } } }]),
+      Payment.aggregate([
+        { $match: { status: 'captured', createdAt: { $gte: start } } },
+        { $group: { _id: dateKey, amount: { $sum: '$amount' } } },
+      ]),
+      Booking.aggregate([{ $match: { createdAt: { $gte: start } } }, { $group: { _id: dateKey, count: { $sum: 1 } } }]),
+      Booking.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Listing.aggregate([{ $match: { status: 'published' } }, { $group: { _id: '$category', count: { $sum: 1 } } }]),
+      AuditLog.aggregate([
+        { $group: { _id: '$action', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 8 },
+      ]),
+      AuditLog.aggregate([
+        { $match: { actor: { $ne: null } } },
+        { $group: { _id: '$actor', count: { $sum: 1 }, lastActive: { $max: '$createdAt' } } },
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+      ]),
+      AuditLog.find().sort('-createdAt').limit(10).populate('actor', 'name email avatarUrl').lean(),
+      Promise.all([
+        User.countDocuments(),
+        Listing.countDocuments(),
+        Booking.countDocuments({ status: { $in: ['confirmed', 'active'] } }),
+        Payment.aggregate([{ $match: { status: 'captured' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      ]),
+    ]);
+
+  const days = dayWindow(windowDays);
+
+  // Resolve the top actor ids back into user documents.
+  const actorUsers = await User.find({ _id: { $in: topActorRows.map((r) => r._id) } })
+    .select('name email avatarUrl isActive')
+    .lean();
+  const userById = Object.fromEntries(actorUsers.map((u) => [u._id.toString(), u]));
+  const topUsers = topActorRows
+    .map((r) => ({ user: userById[r._id.toString()] || null, actions: r.count, lastActive: r.lastActive }))
+    .filter((t) => t.user);
+
+  return new ApiResponse(
+    200,
+    {
+      windowDays,
+      totals: {
+        totalUsers: totals[0],
+        totalListings: totals[1],
+        activeBookings: totals[2],
+        totalRevenue: totals[3][0]?.total || 0,
+      },
+      newSignups: fillSeries(days, signupRows, 'count'),
+      revenueTrend: fillSeries(days, revenueRows, 'amount'),
+      bookingTrend: fillSeries(days, bookingRows, 'count'),
+      bookingsByStatus: bookingStatusRows.map((r) => ({ status: r._id, count: r.count })).sort((a, b) => b.count - a.count),
+      listingsByCategory: categoryRows.map((r) => ({ category: r._id, count: r.count })).sort((a, b) => b.count - a.count),
+      activityBreakdown: actionRows.map((r) => ({ action: r._id, count: r.count })),
+      topUsers,
+      recentActivity: recentLogs,
+    },
+    'Admin analytics'
+  ).send(res);
+});
+
+// ---------------------------------------------------------------------------
+// Audit logs
+// ---------------------------------------------------------------------------
+
+const listAuditLogs = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 25, action, category, resourceType, q, from, to } = req.query;
+
+  const filter = {};
+  if (action) filter.action = action;
+  if (category) filter.category = category;
+  if (resourceType) filter.resourceType = resourceType;
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = new Date(from);
+    if (to) filter.createdAt.$lte = new Date(to);
+  }
+
+  // Free-text search: matches the log summary, or any log whose actor's
+  // name/email matches the query.
+  if (q) {
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(escaped, 'i');
+    const matches = await User.find({ $or: [{ name: re }, { email: re }] }).select('_id').lean();
+    filter.$or = [{ summary: re }, { actor: { $in: matches.map((u) => u._id) } }];
+  }
+
+  const total = await AuditLog.countDocuments(filter);
+  const items = await AuditLog.find(filter)
+    .sort('-createdAt')
+    .skip((page - 1) * limit)
+    .limit(Number(limit))
+    .populate('actor', 'name email avatarUrl role');
+
+  return new ApiResponse(
+    200,
+    {
+      items,
+      pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / limit) },
+    },
+    'Audit logs'
+  ).send(res);
+});
+
+// ---------------------------------------------------------------------------
+// Full-scope resource listings for the admin console
+// ---------------------------------------------------------------------------
+
+const listBookings = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20, status } = req.query;
+  const filter = status ? { status } : {};
+  const total = await Booking.countDocuments(filter);
+  const items = await Booking.find(filter)
+    .sort('-createdAt')
+    .skip((page - 1) * limit)
+    .limit(Number(limit))
+    .populate('listing', 'title photos pricePerDay')
+    .populate('renter', 'name email avatarUrl')
+    .populate('owner', 'name email avatarUrl');
+  return new ApiResponse(
+    200,
+    { items, pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / limit) } },
+    'Bookings'
+  ).send(res);
+});
+
+const listPayments = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20, status } = req.query;
+  const filter = status ? { status } : {};
+  const total = await Payment.countDocuments(filter);
+  const items = await Payment.find(filter)
+    .sort('-createdAt')
+    .skip((page - 1) * limit)
+    .limit(Number(limit))
+    .populate('booking', 'totalAmount status')
+    .populate('payer', 'name email');
+  return new ApiResponse(
+    200,
+    { items, pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / limit) } },
+    'Payments'
+  ).send(res);
+});
+
+// ---------------------------------------------------------------------------
+// Existing admin operations (instrumented with audit logs)
+// ---------------------------------------------------------------------------
+
 const listUsers = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, role } = req.query;
   const filter = role ? { role } : {};
@@ -40,6 +224,18 @@ const listUsers = asyncHandler(async (req, res) => {
 const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
   if (!user) throw ApiError.notFound('User not found');
+  logAudit({
+    actor: req.user._id,
+    action: 'admin.user_updated',
+    category: 'admin',
+    resourceType: 'user',
+    resourceId: user._id.toString(),
+    summary: req.body.isActive !== undefined
+      ? `${req.body.isActive ? 'Restored' : 'Suspended'} user ${user.name}`
+      : `Updated user ${user.name}`,
+    details: req.body,
+    req,
+  });
   return new ApiResponse(200, user.toSafeJSON(), 'User updated').send(res);
 });
 
@@ -53,6 +249,16 @@ const listListingsForModeration = asyncHandler(async (req, res) => {
 const moderateListing = asyncHandler(async (req, res) => {
   const listing = await Listing.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
   if (!listing) throw ApiError.notFound('Listing not found');
+  logAudit({
+    actor: req.user._id,
+    action: 'admin.listing_moderated',
+    category: 'admin',
+    resourceType: 'listing',
+    resourceId: listing._id.toString(),
+    summary: `Changed listing "${listing.title}" to ${req.body.status}`,
+    details: req.body,
+    req,
+  });
   return new ApiResponse(200, listing, 'Listing moderated').send(res);
 });
 
@@ -72,6 +278,17 @@ const resolveDispute = asyncHandler(async (req, res) => {
   dispute.resolutionNote = req.body.resolutionNote;
   dispute.resolvedBy = req.user._id;
   await dispute.save();
+
+  logAudit({
+    actor: req.user._id,
+    action: 'admin.dispute_resolved',
+    category: 'admin',
+    resourceType: 'dispute',
+    resourceId: dispute._id.toString(),
+    summary: `Marked dispute as ${dispute.status}`,
+    details: { resolutionNote: dispute.resolutionNote },
+    req,
+  });
 
   return new ApiResponse(200, dispute, 'Dispute resolved').send(res);
 });
@@ -108,11 +325,26 @@ const reviewKyc = asyncHandler(async (req, res) => {
   kyc.rejectionReason = status === 'rejected' ? rejectionReason || 'Not approved' : null;
   await kyc.save();
 
+  logAudit({
+    actor: req.user._id,
+    action: 'admin.kyc_reviewed',
+    category: 'admin',
+    resourceType: 'kyc',
+    resourceId: kyc._id.toString(),
+    summary: `KYC ${status}${rejectionReason ? ` — ${rejectionReason}` : ''}`,
+    details: { status, rejectionReason },
+    req,
+  });
+
   return new ApiResponse(200, kyc, `KYC ${status}`).send(res);
 });
 
 module.exports = {
   getStats,
+  getAnalytics,
+  listAuditLogs,
+  listBookings,
+  listPayments,
   listUsers,
   updateUser,
   listListingsForModeration,

@@ -70,7 +70,13 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const user = await register({ name, email, phone, password, becomeOwner: role === "owner" });
-      router.push(user.role === "admin" ? ROUTES.ADMIN : ROUTES.HOME);
+      if (user.role === "admin") {
+        router.push(ROUTES.ADMIN);
+      } else if (!user.isEmailVerified) {
+        router.push(`${ROUTES.VERIFY_EMAIL}?email=${encodeURIComponent(user.email)}`);
+      } else {
+        router.push(ROUTES.HOME);
+      }
     } catch (err) {
       setError(errorMessage(err));
     } finally {

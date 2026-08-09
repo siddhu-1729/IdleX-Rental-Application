@@ -1,9 +1,9 @@
-import { AdminGate, AdminSectionPage } from "@/components/marketplace/admin-pages";
+import { AdminGate, AdminPaymentsPage } from "@/components/marketplace/admin-pages";
 
-export default function AdminPaymentsPage() {
+export default function PaymentsAdminPage() {
   return (
     <AdminGate>
-      <AdminSectionPage title="Payments" description="Monitor captured payments, refunds, and owner payouts." />
+      <AdminPaymentsPage />
     </AdminGate>
   );
 }

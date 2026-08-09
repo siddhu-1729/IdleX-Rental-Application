@@ -8,8 +8,8 @@ import { Input, Select, Textarea } from "@/components/ui/input";
 import { Stepper } from "@/components/ui/stepper";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox, RadioGroup } from "@/components/ui/form-controls";
-import { Clock, Repeat, Upload } from "@/components/ui/icons";
-import { api, ApiError } from "@/lib/api-client";
+import { Clock, Mail, Repeat, Upload } from "@/components/ui/icons";
+import { api, ApiError, getStoredUser, setStoredUser } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import type { Kyc, Listing, User } from "@/lib/api-types";
 import { ROUTES } from "@/lib/constants";
@@ -108,11 +108,16 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
         )}
         <FieldError message={error} />
         {notice && <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">{notice}</p>}
-        {mode === "login" && offline && (
-          <p className="rounded-md bg-primary-50 p-3 text-sm text-primary-700">
-            Backend is offline, using the built-in demo mode. Try{" "}
-            <strong>demo@idlex.com</strong> / <strong>demo1234</strong> or create a new account.
-          </p>
+        {mode === "login" && (
+          <div className="rounded-md bg-primary-50 p-3 text-sm text-primary-700">
+            <p className="font-semibold">Demo accounts</p>
+            <p className="mt-1">
+              <strong>admin@gmail.com</strong> / <strong>admin</strong> — admin console
+              <br />
+              <strong>demo@idlex.com</strong> / <strong>demo1234</strong> — renter account
+            </p>
+            {offline && <p className="mt-1 text-xs">Backend is offline — using built-in demo mode.</p>}
+          </div>
         )}
         <Button fullWidth loading={loading}>
           {mode === "forgot" ? "Send reset link" : mode === "otp" ? (code ? "Verify OTP" : "Send OTP") : "Continue"}
@@ -139,6 +144,130 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
   );
 }
 
+/**
+ * Email verification via emailed OTP. Used right after registration and
+ * from /verify-email. Two-phase: send the code, then verify it.
+ */
+export function EmailVerifyPanel({ initialEmail = "" }: { initialEmail?: string }) {
+  const router = useRouter();
+  const { user, refreshUser } = useAuth();
+  const [email, setEmail] = React.useState(initialEmail || user?.email || "");
+  const [code, setCode] = React.useState("");
+  const [codeSent, setCodeSent] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
+
+  const sendCode = async () => {
+    setError(null);
+    setNotice(null);
+    setLoading(true);
+    try {
+      await api.post<null>("/api/auth/email-otp/request", { email: email.trim() });
+      setCodeSent(true);
+      setNotice(`A verification code was sent to ${email.trim()}.`);
+    } catch (err) {
+      if (isNetworkError(err)) {
+        setCodeSent(true);
+        setNotice("Backend offline — demo mode: enter any 6-digit code to verify.");
+      } else {
+        setError(errorMessage(err));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verify = async () => {
+    if (!code.trim() || code.trim().length !== 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+    setError(null);
+    setNotice(null);
+    setLoading(true);
+    try {
+      await api.post<User>("/api/auth/email-otp/verify", { email: email.trim(), code: code.trim() });
+      await refreshUser().catch(() => undefined);
+      setNotice("Email verified successfully.");
+      router.push(ROUTES.HOME);
+    } catch (err) {
+      if (isNetworkError(err)) {
+        const stored = getStoredUser<User>();
+        if (stored) setStoredUser({ ...stored, isEmailVerified: true });
+        setNotice("Demo mode: email verified.");
+        router.push(ROUTES.HOME);
+      } else {
+        setError(errorMessage(err));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!codeSent) void sendCode();
+        else void verify();
+      }}
+      className="mx-auto w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-sm"
+    >
+      <div className="mb-6">
+        <div className="flex items-center gap-2">
+          <Badge variant="default">Email verification</Badge>
+          <Mail size={16} className="text-primary" />
+        </div>
+        <h1 className="mt-3 text-2xl font-bold">Verify your email</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          We&apos;ll send a one-time code to this address so we know it&apos;s really you.
+        </p>
+      </div>
+      <div className="space-y-4">
+        <Input
+          label="Email address"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="siddhu@example.com"
+          required
+        />
+        {codeSent && (
+          <Input
+            label="One-time password"
+            inputMode="numeric"
+            maxLength={6}
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            placeholder="6 digit code"
+          />
+        )}
+        <FieldError message={error} />
+        {notice && <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">{notice}</p>}
+        <Button fullWidth loading={loading}>
+          {codeSent ? "Verify Email" : "Send Code"}
+        </Button>
+        {codeSent && (
+          <button
+            type="button"
+            onClick={() => void sendCode()}
+            disabled={loading}
+            className="mx-auto block text-sm font-semibold text-primary hover:underline"
+          >
+            Resend code
+          </button>
+        )}
+        <div className="flex items-center justify-center text-sm">
+          <Link href={ROUTES.HOME} className="font-semibold text-primary">
+            Skip for now
+          </Link>
+        </div>
+      </div>
+    </form>
+  );
+}
+
 export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean; listingId?: string }) {
   const router = useRouter();
   const { user, refreshUser } = useAuth();
@@ -153,8 +282,11 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
   const nextPhotoId = React.useRef(0);
   const [existingPhotos, setExistingPhotos] = React.useState<Listing["photos"]>([]);
   const [error, setError] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [loadingListing, setLoadingListing] = React.useState(edit);
+  const [otpSent, setOtpSent] = React.useState(false);
+  const [otpCode, setOtpCode] = React.useState("");
 
   React.useEffect(() => {
     if (!edit || !listingId) return;
@@ -210,6 +342,28 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
     });
   };
 
+  // Every listing creation is gated by an emailed OTP. This sends (or
+  // resends) the code; the create call in `submit` verifies it.
+  const sendListingOtp = async () => {
+    setError(null);
+    setNotice(null);
+    setLoading(true);
+    try {
+      await api.post<null>("/api/listings/otp/request", {});
+      setOtpSent(true);
+      setNotice(`A 6-digit code was sent to ${user?.email ?? "your email"}. Enter it below, then click Save again.`);
+    } catch (err) {
+      if (isNetworkError(err)) {
+        setOtpSent(true);
+        setNotice("Backend offline — demo mode: enter any 6-digit code to finish creating your listing.");
+      } else {
+        setError(errorMessage(err));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const submit = async (publish: boolean) => {
     setError(null);
     if (!selectedPhoto && existingPhotos.length === 0) {
@@ -218,6 +372,7 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
     }
     setLoading(true);
     try {
+      // Auto-upgrade a renter to owner on first save
       if (!edit && user && !user.isOwner) {
         const updated = await api.patch<User>("/api/auth/me", { becomeOwner: true });
         await refreshUser().catch(() => updated);
@@ -231,9 +386,23 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
         location: city ? { city } : undefined,
         status: publish ? ("published" as const) : status,
       };
-      const listing = edit && listingId
-        ? await api.put<Listing>(`/api/listings/${listingId}`, payload)
-        : await api.post<Listing>("/api/listings", payload);
+      if (edit && listingId) {
+        const listing = await api.put<Listing>(`/api/listings/${listingId}`, payload);
+        await uploadPhotos(listing._id);
+        router.push(ROUTES.MY_LISTINGS);
+        return;
+      }
+      // Every new listing requires an OTP sent to the owner's email and
+      // verified here — the backend refuses to create one without it.
+      if (!otpSent) {
+        await sendListingOtp();
+        return;
+      }
+      if (!otpCode.trim() || otpCode.trim().length !== 6) {
+        setError("Enter the 6-digit code we emailed you, then click Save again.");
+        return;
+      }
+      const listing = await api.post<Listing>("/api/listings", { ...payload, otpCode: otpCode.trim() });
       await uploadPhotos(listing._id);
       router.push(ROUTES.MY_LISTINGS);
     } catch (err) {
@@ -394,7 +563,35 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
           </div>
         </div>
       </div>
+      {otpSent && !edit && (
+        <div className="rounded-lg border border-primary-200 bg-primary-50 p-5">
+          <div className="flex items-center gap-2 text-primary">
+            <Mail size={18} />
+            <span className="text-sm font-semibold">Email OTP verification</span>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-primary-900">
+            A verification code was sent to <strong>{user?.email ?? "your email"}</strong>. Every
+            listing must be confirmed with this code before it is saved — enter it and click Save
+            again.
+          </p>
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <Input
+              label="6-digit OTP"
+              inputMode="numeric"
+              maxLength={6}
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+              placeholder="Enter code"
+              className="max-w-52"
+            />
+            <Button variant="outline" loading={loading} onClick={() => void sendListingOtp()}>
+              Resend Code
+            </Button>
+          </div>
+        </div>
+      )}
       <FieldError message={error} />
+      {notice && <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">{notice}</p>}
       {loadingListing ? (
         <p className="text-sm text-muted-foreground">Loading listing…</p>
       ) : (

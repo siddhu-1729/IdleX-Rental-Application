@@ -4,14 +4,48 @@ const ApiError = require('../../utils/ApiError');
 const authService = require('./auth.service');
 const { verifyRefreshToken, signAccessToken } = require('../../utils/tokens');
 const User = require('../../models/User');
+const { logAudit } = require('../../utils/audit');
 
 const register = asyncHandler(async (req, res) => {
   const result = await authService.register(req.body);
+  logAudit({
+    actor: result.user?._id,
+    action: 'user.registered',
+    category: 'auth',
+    resourceType: 'user',
+    resourceId: result.user?._id?.toString(),
+    summary: `New account registered`,
+    details: { email: result.user?.email },
+    req,
+  });
   return new ApiResponse(201, result, 'Registered successfully').send(res);
 });
 
 const login = asyncHandler(async (req, res) => {
-  const result = await authService.login(req.body);
+  let result;
+  try {
+    result = await authService.login(req.body);
+  } catch (err) {
+    // Track failed sign-in attempts — useful for spotting brute-force patterns.
+    logAudit({
+      action: 'user.login_failed',
+      category: 'auth',
+      summary: 'Failed sign-in attempt',
+      details: { email: req.body?.email },
+      req,
+    });
+    throw err;
+  }
+  logAudit({
+    actor: result.user?._id,
+    action: 'user.login',
+    category: 'auth',
+    resourceType: 'user',
+    resourceId: result.user?._id?.toString(),
+    summary: 'Signed in',
+    details: { email: result.user?.email, role: result.user?.role },
+    req,
+  });
   return new ApiResponse(200, result, 'Logged in successfully').send(res);
 });
 
@@ -43,6 +77,16 @@ const verifyOtp = asyncHandler(async (req, res) => {
   return new ApiResponse(200, user, 'Phone verified').send(res);
 });
 
+const requestEmailOtp = asyncHandler(async (req, res) => {
+  await authService.requestEmailOtp(req.body.email);
+  return new ApiResponse(200, null, 'If that email exists, a verification code has been sent').send(res);
+});
+
+const verifyEmailOtp = asyncHandler(async (req, res) => {
+  const user = await authService.verifyEmailOtp(req.body.email, req.body.code);
+  return new ApiResponse(200, user, 'Email verified').send(res);
+});
+
 const requestPasswordReset = asyncHandler(async (req, res) => {
   await authService.requestPasswordReset(req.body.email);
   return new ApiResponse(200, null, 'If that email exists, a reset link has been sent').send(res);
@@ -68,6 +112,8 @@ module.exports = {
   refreshToken,
   requestOtp,
   verifyOtp,
+  requestEmailOtp,
+  verifyEmailOtp,
   requestPasswordReset,
   confirmPasswordReset,
   me,

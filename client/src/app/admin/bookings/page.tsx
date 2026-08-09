@@ -1,9 +1,9 @@
-import { AdminGate, AdminSectionPage } from "@/components/marketplace/admin-pages";
+import { AdminGate, AdminBookingsPage } from "@/components/marketplace/admin-pages";
 
-export default function AdminBookingsPage() {
+export default function BookingsAdminPage() {
   return (
     <AdminGate>
-      <AdminSectionPage title="Bookings" description="Review all rental bookings across the marketplace." />
+      <AdminBookingsPage />
     </AdminGate>
   );
 }

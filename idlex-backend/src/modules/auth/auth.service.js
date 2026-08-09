@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const User = require('../../models/User');
 const ApiError = require('../../utils/ApiError');
 const { signAccessToken, signRefreshToken } = require('../../utils/tokens');
-const { generateOtp, sendOtpSms } = require('../../utils/otp');
+const { generateOtp, sendOtpSms, issueEmailOtp, verifyEmailOtpRecord } = require('../../utils/otp');
 
 // Business logic lives here, controllers stay thin (parse req -> call
 // service -> shape response) — mirrors keeping Django views thin and
@@ -60,6 +60,28 @@ async function verifyOtp(phone, code) {
   return user.toSafeJSON();
 }
 
+async function requestEmailOtp(email) {
+  const user = await User.findOne({ email: email.trim().toLowerCase() });
+  if (!user) return; // don't leak whether the email exists
+
+  await issueEmailOtp(user._id, user.email, 'email_verify');
+}
+
+async function verifyEmailOtp(email, code) {
+  const user = await User.findOne({ email: email.trim().toLowerCase() }).select('+emailOtp.code +emailOtp.expiresAt +emailOtp.purpose');
+  if (!user) throw ApiError.notFound('No account found with this email');
+
+  const result = await verifyEmailOtpRecord(user._id, code, 'email_verify');
+  if (!result.ok) {
+    if (result.reason === 'no_request') throw ApiError.badRequest('No email verification code requested');
+    throw ApiError.badRequest('OTP is invalid or expired');
+  }
+
+  user.isEmailVerified = true;
+  await user.save();
+  return user.toSafeJSON();
+}
+
 async function requestPasswordReset(email) {
   const user = await User.findOne({ email });
   if (!user) return; // don't leak whether the email exists
@@ -113,6 +135,8 @@ module.exports = {
   login,
   requestOtp,
   verifyOtp,
+  requestEmailOtp,
+  verifyEmailOtp,
   requestPasswordReset,
   confirmPasswordReset,
   updateMe,

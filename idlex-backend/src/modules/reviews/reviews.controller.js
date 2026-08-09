@@ -4,6 +4,7 @@ const ApiError = require('../../utils/ApiError');
 const Review = require('../../models/Review');
 const Booking = require('../../models/Booking');
 const Listing = require('../../models/Listing');
+const { logAudit } = require('../../utils/audit');
 
 // Create, only if booking is completed.
 const createReview = asyncHandler(async (req, res) => {
@@ -42,6 +43,16 @@ const createReview = asyncHandler(async (req, res) => {
     });
   }
 
+  logAudit({
+    actor: req.user._id,
+    action: 'review.created',
+    category: 'review',
+    resourceType: 'review',
+    resourceId: review._id.toString(),
+    summary: `Left a ${rating}-star review`,
+    details: { booking: booking._id, listing: booking.listing },
+    req,
+  });
   return new ApiResponse(201, review, 'Review created').send(res);
 });
 

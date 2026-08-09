@@ -33,7 +33,7 @@ export const FOOTER_NAV = {
   ],
   Support: [
     { label: "Help Center", href: ROUTES.HELP },
-    { label: "Safety", href: "#" },
+    { label: "Safety", href: ROUTES.SAFETY },
     { label: "Community Guidelines", href: "#" },
     { label: "Contact Us", href: ROUTES.CONTACT },
   ],

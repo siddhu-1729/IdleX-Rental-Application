@@ -9,6 +9,7 @@ export const ROUTES = {
   SEARCH: "/search",
   PRODUCT: (id: string) => `/product/${id}`,
   ABOUT: "/about",
+  SAFETY: "/safety",
   CONTACT: "/contact",
   FAQ: "/faq",
   PRIVACY: "/privacy-policy",
@@ -21,6 +22,7 @@ export const ROUTES = {
   LOGIN: "/login",
   FORGOT_PASSWORD: "/forgot-password",
   VERIFY_OTP: "/verify-otp",
+  VERIFY_EMAIL: "/verify-email",
 
   // Dashboard
   DASHBOARD: "/dashboard",
@@ -76,8 +78,19 @@ export type BookingStatus = (typeof BOOKING_STATUS)[keyof typeof BOOKING_STATUS]
 /**
  * Routes visible without logging in: the home page and the auth pages.
  * Every other page is protected by RouteGuard and requires a logged-in user.
+ * /verify-email stays public so a freshly registered (already signed-in)
+ * user can complete verification; it is deliberately NOT an AUTH_PAGES
+ * entry, or RouteGuard would bounce the new user straight back home.
  */
-export const PUBLIC_ROUTES = ["/", "/login", "/register", "/sign-up", "/forgot-password", "/verify-otp"] as const;
+export const PUBLIC_ROUTES = [
+  "/",
+  "/login",
+  "/register",
+  "/sign-up",
+  "/forgot-password",
+  "/verify-otp",
+  "/verify-email",
+] as const;
 
 /** Auth pages a signed-in user should be redirected away from. */
 export const AUTH_PAGES = ["/login", "/register", "/sign-up", "/forgot-password", "/verify-otp"] as const;

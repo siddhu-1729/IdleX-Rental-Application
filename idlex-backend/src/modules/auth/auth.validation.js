@@ -21,6 +21,15 @@ const otpVerifySchema = z.object({
   code: z.string().length(6),
 });
 
+const emailOtpRequestSchema = z.object({
+  email: z.string().email(),
+});
+
+const emailOtpVerifySchema = z.object({
+  email: z.string().email(),
+  code: z.string().length(6),
+});
+
 const passwordResetRequestSchema = z.object({
   email: z.string().email(),
 });
@@ -44,6 +53,8 @@ module.exports = {
   loginSchema,
   otpRequestSchema,
   otpVerifySchema,
+  emailOtpRequestSchema,
+  emailOtpVerifySchema,
   passwordResetRequestSchema,
   passwordResetConfirmSchema,
   updateMeSchema,

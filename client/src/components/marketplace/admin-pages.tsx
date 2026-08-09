@@ -6,53 +6,642 @@ import { AdminShell } from "@/components/marketplace/admin-shell";
 import { StatCard } from "@/components/shared/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input, Select } from "@/components/ui/input";
 import { Table, Td, Th } from "@/components/ui/data-table";
+import { LineChart, BarChart, DonutChart, ProgressRows, type ChartDatum } from "@/components/marketplace/charts";
 import { api } from "@/lib/api-client";
 import { RequireAuth, useAuth, errorMessage, useIsMounted } from "@/lib/auth";
-import { useFetchData } from "@/lib/use-fetch-data";
-import { formatCurrency, formatDate } from "@/lib/formatters";
-import type { AdminStats, Dispute, Kyc, Listing, User } from "@/lib/api-types";
+import { ApiError, useFetchData } from "@/lib/use-fetch-data";
+import { formatCurrency, formatDate, formatDateTime, timeAgo } from "@/lib/formatters";
+import type {
+  AdminAnalytics,
+  AdminBookingsResult,
+  AdminPaymentsResult,
+  AdminStats,
+  AuditLog,
+  AuditLogResult,
+  Booking,
+  Dispute,
+  Kyc,
+  Listing,
+  Pagination,
+  Payment,
+  SeriesPoint,
+  User,
+} from "@/lib/api-types";
 import { ROUTES } from "@/lib/constants";
 
-function AdminError({ message }: { message: string | null }) {
-  if (!message) return null;
-  return <p className="mb-4 rounded-md bg-danger-50 p-3 text-sm text-danger">{message}</p>;
+function AdminError({ error }: { error?: Error | null }) {
+  if (!error) return null;
+  const isApiResponse = error instanceof ApiError;
+  return (
+    <p className="mb-4 rounded-md bg-danger-50 p-3 text-sm text-danger">
+      {error.message}
+      {!isApiResponse && (
+        <span className="mt-1 block text-xs text-muted-foreground">
+          Tip: start the backend with <code className="rounded bg-muted px-1">npm run dev</code> inside idlex-backend/ to see live data.
+        </span>
+      )}
+    </p>
+  );
 }
 
+function shortDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+function toChartData(series?: SeriesPoint[]): ChartDatum[] {
+  return (series ?? []).map((s) => ({ label: shortDate(s.date), value: s.value }));
+}
+
+function trend(series?: SeriesPoint[]): { value: string; type: "increase" | "decrease" } | undefined {
+  if (!series || series.length < 2) return undefined;
+  const last = series[series.length - 1].value;
+  const prev = series[series.length - 2].value;
+  if (last === prev) return undefined;
+  const pct = prev === 0 ? 100 : Math.round(((last - prev) / prev) * 100);
+  return { value: `${Math.abs(pct)}%`, type: last > prev ? "increase" : "decrease" };
+}
+
+function CategoryBadge({ category }: { category: AuditLog["category"] }) {
+  const map: Record<AuditLog["category"], "default" | "success" | "warning" | "danger"> = {
+    auth: "default",
+    listing: "warning",
+    booking: "warning",
+    payment: "success",
+    kyc: "default",
+    review: "success",
+    admin: "danger",
+    system: "default",
+  };
+  return <Badge variant={map[category] ?? "default"}>{category}</Badge>;
+}
+
+function actorName(log: AuditLog): string {
+  if (log.actor && typeof log.actor === "object") return log.actor.name || log.actor.email || "User";
+  return "System";
+}
+
+function PaginationBar({ pagination, onPage }: { pagination: Pagination | null; onPage: (page: number) => void }) {
+  if (!pagination || pagination.pages <= 1) return null;
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+      <span>
+        Page {pagination.page} of {pagination.pages} · {pagination.total} record{pagination.total === 1 ? "" : "s"}
+      </span>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" disabled={pagination.page <= 1} onClick={() => onPage(pagination.page - 1)}>
+          Previous
+        </Button>
+        <Button size="sm" variant="outline" disabled={pagination.page >= pagination.pages} onClick={() => onPage(pagination.page + 1)}>
+          Next
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+const CATEGORY_OPTIONS = [
+  { value: "", label: "All categories" },
+  { value: "auth", label: "Auth" },
+  { value: "listing", label: "Listing" },
+  { value: "booking", label: "Booking" },
+  { value: "payment", label: "Payment" },
+  { value: "kyc", label: "KYC" },
+  { value: "review", label: "Review" },
+  { value: "admin", label: "Admin" },
+  { value: "system", label: "System" },
+];
+
+const ACTION_OPTIONS = [
+  { value: "", label: "All actions" },
+  { value: "user.login", label: "Sign in" },
+  { value: "user.registered", label: "Register" },
+  { value: "listing.created", label: "Listing created" },
+  { value: "listing.updated", label: "Listing updated" },
+  { value: "listing.deleted", label: "Listing deleted" },
+  { value: "booking.created", label: "Booking requested" },
+  { value: "booking.confirmed", label: "Booking confirmed" },
+  { value: "booking.cancelled", label: "Booking cancelled" },
+  { value: "booking.completed", label: "Booking completed" },
+  { value: "booking.extension_requested", label: "Extension requested" },
+  { value: "booking.extension_responded", label: "Extension responded" },
+  { value: "booking.return_requested", label: "Return requested" },
+  { value: "payment.intent_created", label: "Payment initiated" },
+  { value: "kyc.submitted", label: "KYC submitted" },
+  { value: "kyc.step_saved", label: "KYC step saved" },
+  { value: "review.created", label: "Review created" },
+  { value: "admin.user_updated", label: "Admin user action" },
+  { value: "admin.listing_moderated", label: "Listing moderated" },
+  { value: "admin.dispute_resolved", label: "Dispute resolved" },
+  { value: "admin.kyc_reviewed", label: "KYC reviewed" },
+];
+
+const RESOURCE_OPTIONS = [
+  { value: "", label: "All resources" },
+  { value: "user", label: "User" },
+  { value: "listing", label: "Listing" },
+  { value: "booking", label: "Booking" },
+  { value: "payment", label: "Payment" },
+  { value: "kyc", label: "KYC" },
+  { value: "review", label: "Review" },
+  { value: "dispute", label: "Dispute" },
+];
+
+function bookingStatusVariant(status: Booking["status"]): "default" | "success" | "warning" | "danger" {
+  switch (status) {
+    case "confirmed":
+    case "completed":
+      return "success";
+    case "cancelled":
+    case "disputed":
+      return "danger";
+    case "requested":
+    case "return_requested":
+      return "warning";
+    default:
+      return "default";
+  }
+}
+
+function paymentStatusVariant(status: Payment["status"]): "default" | "success" | "warning" | "danger" {
+  switch (status) {
+    case "captured":
+      return "success";
+    case "failed":
+      return "danger";
+    case "authorized":
+      return "warning";
+    default:
+      return "default";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard — graphical metrics + activity
+// ---------------------------------------------------------------------------
+
 export function AdminOverview() {
-  const { data } = useFetchData<AdminStats>("/api/admin/stats", []);
-  const { data: pendingKyc } = useFetchData<Kyc[]>("/api/admin/kyc?status=pending", []);
-  const { data: openDisputes } = useFetchData<Dispute[]>("/api/admin/disputes", []);
+  const { data: analytics, error: analyticsError } = useFetchData<AdminAnalytics>("/api/admin/analytics", []);
+  const { data: stats } = useFetchData<AdminStats>("/api/admin/stats", []);
+
+  const totals = analytics?.totals ?? stats;
+  const activity = analytics?.recentActivity ?? [];
 
   return (
     <AdminShell>
-      <div className="grid gap-4 md:grid-cols-4">
-        <StatCard title="Users" value={(data?.totalUsers ?? 0).toLocaleString("en-IN")} description="Registered accounts" icon="Users" />
-        <StatCard title="Listings" value={(data?.totalListings ?? 0).toLocaleString("en-IN")} description="Across all categories" icon="Package" />
-        <StatCard title="Active bookings" value={(data?.activeBookings ?? 0).toString()} description="Confirmed + active" icon="CalendarCheck" />
-        <StatCard title="Revenue" value={formatCurrency(data?.totalRevenue ?? 0)} description="Captured payments" icon="Wallet" />
+      <AdminError error={analyticsError} />
+
+      {/* Stat cards */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Total users"
+          value={(totals?.totalUsers ?? 0).toLocaleString("en-IN")}
+          description="Registered accounts"
+          icon="Users"
+          change={trend(analytics?.newSignups)}
+        />
+        <StatCard
+          title="Listings"
+          value={(totals?.totalListings ?? 0).toLocaleString("en-IN")}
+          description="Across all categories"
+          icon="Package"
+        />
+        <StatCard
+          title="Active bookings"
+          value={(totals?.activeBookings ?? 0).toString()}
+          description="Confirmed + active"
+          icon="CalendarCheck"
+          change={trend(analytics?.bookingTrend)}
+        />
+        <StatCard
+          title="Revenue"
+          value={formatCurrency(totals?.totalRevenue ?? 0)}
+          description="Captured payments"
+          icon="Wallet"
+          change={trend(analytics?.revenueTrend)}
+        />
       </div>
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
+
+      {/* Trend charts */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-border bg-card p-5">
-          <h2 className="mb-3 font-semibold">Pending KYC ({pendingKyc?.length ?? 0})</h2>
-          {pendingKyc?.map((k) => (
-            <p key={k._id} className="border-b border-border py-2 text-sm last:border-0">
-              {typeof k.user === "object" ? k.user.name : k.user} — <span className="text-muted-foreground">{k.currentStep}</span>
-            </p>
-          ))}
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">New signups</h2>
+              <p className="text-xs text-muted-foreground">Last {analytics?.windowDays ?? 30} days</p>
+            </div>
+            <Badge>Live</Badge>
+          </div>
+          <LineChart data={toChartData(analytics?.newSignups)} />
         </div>
         <div className="rounded-lg border border-border bg-card p-5">
-          <h2 className="mb-3 font-semibold">Open disputes ({openDisputes?.filter((d) => d.status === "open").length ?? 0})</h2>
-          {openDisputes?.filter((d) => d.status === "open").map((d) => (
-            <p key={d._id} className="border-b border-border py-2 text-sm last:border-0">
-              {d.reason} — <span className="text-muted-foreground">{formatDate(d.createdAt)}</span>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">Revenue</h2>
+              <p className="text-xs text-muted-foreground">Captured payments per day</p>
+            </div>
+            <Badge variant="success">INR</Badge>
+          </div>
+          <BarChart data={toChartData(analytics?.revenueTrend)} color="#10b981" formatter={(v) => formatCurrency(v)} />
+        </div>
+      </div>
+
+      {/* Distribution */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <div className="rounded-lg border border-border bg-card p-5">
+          <h2 className="mb-4 font-semibold">Bookings by status</h2>
+          <DonutChart
+            data={(analytics?.bookingsByStatus ?? []).map((b) => ({ label: b.status, value: b.count }))}
+            centerLabel="Bookings"
+          />
+        </div>
+        <div className="rounded-lg border border-border bg-card p-5">
+          <h2 className="mb-4 font-semibold">Listings by category</h2>
+          <ProgressRows
+            data={(analytics?.listingsByCategory ?? []).map((c) => ({ label: c.category, value: c.count }))}
+          />
+        </div>
+        <div className="rounded-lg border border-border bg-card p-5">
+          <h2 className="mb-4 font-semibold">Top activity</h2>
+          <ProgressRows data={(analytics?.activityBreakdown ?? []).map((a) => ({ label: a.action, value: a.count }))} color="#f59e0b" />
+        </div>
+      </div>
+
+      {/* Activity feed + top users */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-border bg-card p-5">
+          <h2 className="mb-4 font-semibold">Recent activity</h2>
+          {activity.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No activity yet — it appears here as users sign in, book, list items, and take other actions.
             </p>
-          ))}
+          ) : (
+            <ul className="divide-y divide-border">
+              {activity.map((log) => (
+                <li key={log._id} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-50 text-xs font-bold text-primary">
+                    {actorName(log).slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm">
+                      <span className="font-semibold">{actorName(log)}</span>{" "}
+                      <span className="text-muted-foreground">{log.summary}</span>
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{timeAgo(log.createdAt)}</p>
+                  </div>
+                  <CategoryBadge category={log.category} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="rounded-lg border border-border bg-card p-5">
+          <h2 className="mb-4 font-semibold">Most active users</h2>
+          {(analytics?.topUsers ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No user activity recorded yet.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {(analytics?.topUsers ?? []).map(({ user, actions, lastActive }) => (
+                <li key={user?._id ?? "unknown"} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-secondary-50 text-xs font-bold text-secondary-700">
+                    {user?.name?.slice(0, 2).toUpperCase() ?? "?"}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{user?.name ?? "Deleted user"}</p>
+                    <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold">{actions} actions</p>
+                    <p className="text-xs text-muted-foreground">{timeAgo(lastActive)}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </AdminShell>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Audit logs
+// ---------------------------------------------------------------------------
+
+export function AdminAuditLogsPage() {
+  const [page, setPage] = React.useState(1);
+  const [q, setQ] = React.useState("");
+  const [debouncedQ, setDebouncedQ] = React.useState("");
+  const [category, setCategory] = React.useState("");
+  const [action, setAction] = React.useState("");
+  const [resourceType, setResourceType] = React.useState("");
+  const [from, setFrom] = React.useState("");
+  const [to, setTo] = React.useState("");
+  const [expanded, setExpanded] = React.useState<string | null>(null);
+
+  // Debounce the free-text search so we don't fire a request per keystroke.
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      setPage(1);
+      setDebouncedQ(q);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const reset = (fn: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setPage(1);
+    fn(e.target.value);
+  };
+
+  const params = new URLSearchParams({ limit: "25", page: String(page) });
+  if (debouncedQ) params.set("q", debouncedQ);
+  if (category) params.set("category", category);
+  if (action) params.set("action", action);
+  if (resourceType) params.set("resourceType", resourceType);
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+
+  const { data, isLoading, error } = useFetchData<AuditLogResult>(`/api/admin/audit-logs?${params.toString()}`, [page, debouncedQ, category, action, resourceType, from, to]);
+
+  return (
+    <AdminShell>
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold">Audit Logs</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Every meaningful action across the platform — sign-ins, bookings, listings, KYC reviews and admin changes.
+        </p>
+      </div>
+
+      {/* Filters */}
+      <div className="grid gap-3 rounded-lg border border-border bg-card p-4 md:grid-cols-2 xl:grid-cols-6">
+        <div className="xl:col-span-2">
+          <Input label="Search" placeholder="Actor name, email or summary…" value={q} onChange={reset(setQ)} />
+        </div>
+        <Select label="Category" value={category} onChange={reset(setCategory)} options={CATEGORY_OPTIONS} />
+        <Select label="Action" value={action} onChange={reset(setAction)} options={ACTION_OPTIONS} />
+        <Select label="Resource" value={resourceType} onChange={reset(setResourceType)} options={RESOURCE_OPTIONS} />
+        <div className="grid grid-cols-2 gap-2">
+          <Input label="From" type="date" value={from} onChange={reset(setFrom)} />
+          <Input label="To" type="date" value={to} onChange={reset(setTo)} />
+        </div>
+      </div>
+
+      <AdminError error={error} />
+      {isLoading && <p className="mt-4 text-sm text-muted-foreground">Loading…</p>}
+
+      <section className="mt-6 rounded-lg border border-border bg-card p-5">
+        <Table>
+          <thead>
+            <tr>
+              <Th>When</Th>
+              <Th>Actor</Th>
+              <Th>Action</Th>
+              <Th>Category</Th>
+              <Th>Resource</Th>
+              <Th>Summary</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data?.items ?? []).map((log) => (
+              <React.Fragment key={log._id}>
+                <tr
+                  className={expanded === log._id ? "bg-muted/60" : "cursor-pointer hover:bg-muted/50"}
+                  onClick={() => setExpanded(expanded === log._id ? null : log._id)}
+                >
+                  <Td className="whitespace-nowrap">{formatDateTime(log.createdAt)}</Td>
+                  <Td>{actorName(log)}</Td>
+                  <Td>
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{log.action}</code>
+                  </Td>
+                  <Td><CategoryBadge category={log.category} /></Td>
+                  <Td className="text-muted-foreground">
+                    {log.resourceType ? (
+                      <span className="whitespace-nowrap">
+                        {log.resourceType}
+                        {log.resourceId ? <span className="text-xs"> · {log.resourceId.slice(-6)}</span> : null}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </Td>
+                  <Td className="max-w-xs">
+                    <span className="truncate">{log.summary || "—"}</span>
+                  </Td>
+                </tr>
+                {expanded === log._id && (
+                  <tr className="bg-muted/60">
+                    <Td colSpan={6}>
+                      <div className="grid gap-3 text-sm md:grid-cols-2">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Context</p>
+                          <p className="mt-1">
+                            IP: <span className="font-mono text-xs">{log.ip ?? "—"}</span>
+                          </p>
+                          <p className="mt-0.5">
+                            User agent: <span className="text-xs text-muted-foreground">{log.userAgent ?? "—"}</span>
+                          </p>
+                          {log.resourceId && (
+                            <p className="mt-0.5">
+                              Resource id: <span className="font-mono text-xs">{log.resourceId}</span>
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Details</p>
+                          {log.details ? (
+                            <pre className="mt-1 overflow-x-auto rounded-md bg-muted p-2 text-xs">{JSON.stringify(log.details, null, 2)}</pre>
+                          ) : (
+                            <p className="mt-1 text-muted-foreground">No additional details.</p>
+                          )}
+                        </div>
+                      </div>
+                    </Td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+            {(data?.items ?? []).length === 0 && !isLoading && (
+              <tr>
+                <Td colSpan={6} className="py-8 text-center text-muted-foreground">
+                  No audit logs match your filters.
+                </Td>
+              </tr>
+            )}
+          </tbody>
+        </Table>
+        <PaginationBar pagination={data?.pagination ?? null} onPage={setPage} />
+      </section>
+    </AdminShell>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bookings & payments
+// ---------------------------------------------------------------------------
+
+const BOOKING_STATUS_OPTIONS = [
+  { value: "", label: "All statuses" },
+  { value: "requested", label: "Requested" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "active", label: "Active" },
+  { value: "return_requested", label: "Return requested" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "disputed", label: "Disputed" },
+];
+
+export function AdminBookingsPage() {
+  const [page, setPage] = React.useState(1);
+  const [status, setStatus] = React.useState("");
+  const params = new URLSearchParams({ limit: "20", page: String(page) });
+  if (status) params.set("status", status);
+  const { data, isLoading, error } = useFetchData<AdminBookingsResult>(`/api/admin/bookings?${params.toString()}`, [page, status]);
+
+  const person = (ref: unknown): string => {
+    if (ref && typeof ref === "object" && "name" in ref) {
+      const name = (ref as { name?: unknown }).name;
+      return typeof name === "string" && name ? name : "—";
+    }
+    return "—";
+  };
+
+  return (
+    <AdminShell>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Bookings</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Every rental booking across the marketplace.</p>
+        </div>
+        <Select
+          className="w-48"
+          value={status}
+          onChange={(e) => {
+            setPage(1);
+            setStatus(e.target.value);
+          }}
+          options={BOOKING_STATUS_OPTIONS}
+        />
+      </div>
+      <AdminError error={error} />
+      {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      <section className="mt-6 rounded-lg border border-border bg-card p-5">
+        <Table>
+          <thead>
+            <tr>
+              <Th>Item</Th>
+              <Th>Renter</Th>
+              <Th>Owner</Th>
+              <Th>Dates</Th>
+              <Th>Total</Th>
+              <Th>Status</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data?.items ?? []).map((b) => (
+              <tr key={b._id}>
+                <Td className="max-w-55">
+                  <span className="truncate">{typeof b.listing === "object" ? b.listing.title : "Listing"}</span>
+                </Td>
+                <Td>{person(b.renter)}</Td>
+                <Td>{person(b.owner)}</Td>
+                <Td className="whitespace-nowrap text-xs text-muted-foreground">
+                  {formatDate(b.startDate)} → {formatDate(b.endDate)}
+                </Td>
+                <Td className="font-semibold">{formatCurrency(b.totalAmount)}</Td>
+                <Td><Badge variant={bookingStatusVariant(b.status)}>{b.status.replaceAll("_", " ")}</Badge></Td>
+              </tr>
+            ))}
+            {(data?.items ?? []).length === 0 && !isLoading && (
+              <tr>
+                <Td colSpan={6} className="py-8 text-center text-muted-foreground">No bookings yet.</Td>
+              </tr>
+            )}
+          </tbody>
+        </Table>
+        <PaginationBar pagination={data?.pagination ?? null} onPage={setPage} />
+      </section>
+    </AdminShell>
+  );
+}
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: "", label: "All statuses" },
+  { value: "created", label: "Created" },
+  { value: "authorized", label: "Authorized" },
+  { value: "captured", label: "Captured" },
+  { value: "failed", label: "Failed" },
+  { value: "refunded", label: "Refunded" },
+];
+
+export function AdminPaymentsPage() {
+  const [page, setPage] = React.useState(1);
+  const [status, setStatus] = React.useState("");
+  const params = new URLSearchParams({ limit: "20", page: String(page) });
+  if (status) params.set("status", status);
+  const { data, isLoading, error } = useFetchData<AdminPaymentsResult>(`/api/admin/payments?${params.toString()}`, [page, status]);
+
+  return (
+    <AdminShell>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Payments & Payouts</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Monitor captured payments, refunds, and owner payouts.</p>
+        </div>
+        <Select
+          className="w-48"
+          value={status}
+          onChange={(e) => {
+            setPage(1);
+            setStatus(e.target.value);
+          }}
+          options={PAYMENT_STATUS_OPTIONS}
+        />
+      </div>
+      <AdminError error={error} />
+      {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      <section className="mt-6 rounded-lg border border-border bg-card p-5">
+        <Table>
+          <thead>
+            <tr>
+              <Th>Payer</Th>
+              <Th>Order</Th>
+              <Th>Gateway</Th>
+              <Th>Amount</Th>
+              <Th>Status</Th>
+              <Th>Date</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data?.items ?? []).map((p) => (
+              <tr key={p._id}>
+                <Td>{typeof p.payer === "object" ? p.payer.name : "User"}</Td>
+                <Td>
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{p.gatewayOrderId}</code>
+                </Td>
+                <Td className="capitalize text-muted-foreground">{p.gateway}</Td>
+                <Td className="font-semibold">{formatCurrency(p.amount)}</Td>
+                <Td><Badge variant={paymentStatusVariant(p.status)}>{p.status}</Badge></Td>
+                <Td className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(p.createdAt)}</Td>
+              </tr>
+            ))}
+            {(data?.items ?? []).length === 0 && !isLoading && (
+              <tr>
+                <Td colSpan={6} className="py-8 text-center text-muted-foreground">No payments yet.</Td>
+              </tr>
+            )}
+          </tbody>
+        </Table>
+        <PaginationBar pagination={data?.pagination ?? null} onPage={setPage} />
+      </section>
+    </AdminShell>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Existing pages
+// ---------------------------------------------------------------------------
 
 export function AdminUsersPage() {
   const { data, isLoading, error, refetch } = useFetchData<User[]>("/api/admin/users", []);
@@ -70,7 +659,7 @@ export function AdminUsersPage() {
           <p className="mt-1 text-sm text-muted-foreground">Manage registered accounts and suspensions.</p>
         </div>
       </div>
-      <AdminError message={error?.message ?? null} />
+      <AdminError error={error} />
       {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
       <section className="mt-6 rounded-lg border border-border bg-card p-5">
         <Table>
@@ -116,7 +705,7 @@ export function AdminListingsPage() {
           <p className="mt-1 text-sm text-muted-foreground">Moderate published listings.</p>
         </div>
       </div>
-      <AdminError message={error?.message ?? null} />
+      <AdminError error={error} />
       {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
       <section className="mt-6 rounded-lg border border-border bg-card p-5">
         <Table>
@@ -167,7 +756,7 @@ export function AdminDisputesPage() {
           <p className="mt-1 text-sm text-muted-foreground">Review and resolve disputes.</p>
         </div>
       </div>
-      <AdminError message={error?.message ?? null} />
+      <AdminError error={error} />
       {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
       <section className="mt-6 rounded-lg border border-border bg-card p-5">
         <Table>
@@ -211,7 +800,7 @@ export function AdminKycPage() {
           <p className="mt-1 text-sm text-muted-foreground">Approve identity, address, bank, and higher-value rental checks.</p>
         </div>
       </div>
-      <AdminError message={error?.message ?? null} />
+      <AdminError error={error} />
       {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
       <section className="mt-6 rounded-lg border border-border bg-card p-5">
         <Table>
@@ -259,7 +848,7 @@ export function AdminReportsPage() {
           <p className="mt-1 text-sm text-muted-foreground">Flagged content queue.</p>
         </div>
       </div>
-      <AdminError message={error?.message ?? null} />
+      <AdminError error={error} />
       {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
       <section className="mt-6 rounded-lg border border-border bg-card p-5">
         <Table>
@@ -312,12 +901,12 @@ export function AdminSectionPage({ title, description }: { title: string; descri
           </Button>
         )}
       </div>
-      <AdminError message={error} />
+      <AdminError error={error ? new Error(error) : null} />
       <div className="mt-6 rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">
         {user?.role === "admin" ? (
           <>
-            Signed in as <strong className="text-foreground">{user.email}</strong>. This section is
-            rendered from static mock data — the backend does not expose a dedicated endpoint for it.
+            Signed in as <strong className="text-foreground">{user.email}</strong>. This section is rendered
+            from static mock data — the backend does not expose a dedicated endpoint for it yet.
           </>
         ) : (
           <>

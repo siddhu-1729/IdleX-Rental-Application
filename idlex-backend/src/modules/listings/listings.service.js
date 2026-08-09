@@ -1,5 +1,6 @@
 const Listing = require('../../models/Listing');
 const ApiError = require('../../utils/ApiError');
+const { issueEmailOtp, verifyEmailOtpRecord } = require('../../utils/otp');
 
 // Doubles as the "search" layer: the Django doc keeps search as a thin
 // query layer over Listing rather than a separate resource — this
@@ -55,4 +56,24 @@ async function getOwnedListingOr404(id, ownerId) {
   return listing;
 }
 
-module.exports = { queryListings, getOwnedListingOr404 };
+// Sends a per-listing verification OTP to the owner's email. Every
+// single listing the user creates must be confirmed with one of these
+// before the Listing document is written.
+async function createListingOtp(user) {
+  await issueEmailOtp(user._id, user.email, 'listing');
+}
+
+// For POST /api/listings — the submitted code must match the stored
+// 'listing'-purpose OTP or the creation is rejected. Consumes the OTP on
+// success so a code can't be reused for a second listing.
+async function assertValidListingOtp(userId, otpCode) {
+  const result = await verifyEmailOtpRecord(userId, otpCode, 'listing');
+  if (!result.ok) {
+    if (result.reason === 'no_request') {
+      throw ApiError.badRequest('Request an OTP for this listing before creating it');
+    }
+    throw ApiError.badRequest('OTP is invalid or expired');
+  }
+}
+
+module.exports = { queryListings, getOwnedListingOr404, createListingOtp, assertValidListingOtp };

@@ -3,11 +3,22 @@ const ApiResponse = require('../../utils/ApiResponse');
 const ApiError = require('../../utils/ApiError');
 const paymentsService = require('./payments.service');
 const { Payout, PayoutSettings } = require('../../models/Payout');
+const { logAudit } = require('../../utils/audit');
 
 const checkout = asyncHandler(async (req, res) => {
   const { bookingId } = req.body;
   if (!bookingId) throw ApiError.badRequest('bookingId is required');
   const payment = await paymentsService.createCheckoutOrder(bookingId, req.user._id);
+  logAudit({
+    actor: req.user._id,
+    action: 'payment.intent_created',
+    category: 'payment',
+    resourceType: 'payment',
+    resourceId: payment._id?.toString(),
+    summary: 'Initiated a payment',
+    details: { booking: bookingId, amount: payment.amount, status: payment.status },
+    req,
+  });
   return new ApiResponse(201, payment, 'Payment intent created').send(res);
 });
 
@@ -40,6 +51,17 @@ const handleWebhook = asyncHandler(async (req, res) => {
   const { event, order_id: orderId, payment_id: paymentId } = req.body;
   if (event === 'payment.captured') {
     await paymentsService.markPaymentCaptured(orderId, paymentId, signature);
+    // No session user here — the webhook is gateway-authenticated, so the
+    // audit log has a null actor but still lands in the activity trail.
+    logAudit({
+      action: 'payment.captured',
+      category: 'payment',
+      resourceType: 'payment',
+      resourceId: orderId || null,
+      summary: 'Payment captured via gateway',
+      details: { orderId, paymentId },
+      req,
+    });
   }
 
   res.status(200).json({ received: true });
