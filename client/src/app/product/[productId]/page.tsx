@@ -6,7 +6,7 @@ import { PublicShell } from "@/components/marketplace/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Heart, MapPin, ShieldCheck } from "@/components/ui/icons";
+import { Heart, MapPin, Repeat, ShieldCheck } from "@/components/ui/icons";
 import { StarRating } from "@/components/ui/star-rating";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { useFetchData } from "@/lib/use-fetch-data";
@@ -82,6 +82,11 @@ export default function ProductPage({ params }: { params: Promise<{ productId: s
             <div className="mt-4 flex flex-wrap gap-2">
               <Badge variant={listing.status === "published" ? "success" : "secondary"}>{listing.status}</Badge>
               {listing.securityDeposit > 0 && <Badge variant="secondary">Deposit {formatCurrency(listing.securityDeposit)}</Badge>}
+              {listing.extension?.allowed ? (
+                <Badge variant="success">Extension available</Badge>
+              ) : (
+                <Badge variant="outline">No extension allowed</Badge>
+              )}
             </div>
             <p className="mt-6 leading-7 text-muted-foreground">{listing.description}</p>
 
@@ -119,6 +124,31 @@ export default function ProductPage({ params }: { params: Promise<{ productId: s
               <p className="flex justify-between"><span>Security deposit</span><strong>{formatCurrency(listing.securityDeposit)}</strong></p>
               <p className="mt-2 flex justify-between"><span>Platform protection</span><strong>Included</strong></p>
             </div>
+            {listing.extension?.allowed ? (
+              <div className="rounded-lg border border-primary-200 bg-primary-50 p-4 text-sm text-primary-900">
+                <p className="flex items-center gap-2 font-semibold text-primary">
+                  <Repeat size={16} />
+                  Rental extension available
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-primary-900">
+                  <li>
+                    Pricing:{" "}
+                    {listing.extension.pricing === "custom"
+                      ? `${listing.extension.ratePercent}% above the daily rate`
+                      : "Same as the daily rate"}
+                  </li>
+                  <li>Request: at least {listing.extension.requestBeforeHours}h before the booking ends</li>
+                  <li>Maximum: {listing.extension.maxExtensionDays} extra day{listing.extension.maxExtensionDays === 1 ? "" : "s"}</li>
+                </ul>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">
+                <p className="flex items-center gap-2">
+                  <Repeat size={16} />
+                  No extension allowed
+                </p>
+              </div>
+            )}
             <div className="flex items-center gap-2 rounded-lg border border-secondary-200 bg-secondary-50 p-3 text-sm text-secondary-700">
               <ShieldCheck size={18} />
               KYC verified owner and protected handover

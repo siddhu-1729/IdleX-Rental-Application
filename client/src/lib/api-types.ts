@@ -61,6 +61,13 @@ export type Listing = {
   };
   photos: ListingPhoto[];
   availability: AvailabilityBlock[];
+  extension?: {
+    allowed: boolean;
+    pricing: "same" | "custom";
+    ratePercent: number;
+    requestBeforeHours: number;
+    maxExtensionDays: number;
+  };
   status: ListingStatus;
   ratingAvg: number;
   ratingCount: number;
@@ -279,6 +286,7 @@ export type MarketplaceStats = {
   activeListings: number;
   happyRenters: number;
   averageRating: number;
+  listingsByCategory: { category: string; count: number }[];
 };
 
 export type AuthResult = {
@@ -336,6 +344,7 @@ export type ListingCardShape = {
   reviews: number;
   image: string;
   tags: string[];
+  status: ListingStatus;
 };
 
 export function toCard(listing: Listing): ListingCardShape {
@@ -349,5 +358,6 @@ export function toCard(listing: Listing): ListingCardShape {
     reviews: listing.ratingCount || 0,
     image: listingImage(listing),
     tags: [listing.status === "published" ? "Available" : listing.status],
+    status: listing.status,
   };
 }

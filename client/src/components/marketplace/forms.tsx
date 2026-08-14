@@ -41,12 +41,16 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
   };
 
   const redirectAfterAuth = (user?: { role?: string }) => {
+    if (user?.role === "admin") {
+      router.replace(ROUTES.ADMIN);
+      return;
+    }
     const next = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("next");
     if (next && next.startsWith("/")) {
       router.replace(next);
       return;
     }
-    router.replace(user?.role === "admin" ? ROUTES.ADMIN : ROUTES.HOME);
+    router.replace(ROUTES.HOME);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,16 +112,10 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
         )}
         <FieldError message={error} />
         {notice && <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">{notice}</p>}
-        {mode === "login" && (
-          <div className="rounded-md bg-primary-50 p-3 text-sm text-primary-700">
-            <p className="font-semibold">Demo accounts</p>
-            <p className="mt-1">
-              <strong>admin@gmail.com</strong> / <strong>admin</strong> — admin console
-              <br />
-              <strong>demo@idlex.com</strong> / <strong>demo1234</strong> — renter account
-            </p>
-            {offline && <p className="mt-1 text-xs">Backend is offline — using built-in demo mode.</p>}
-          </div>
+        {mode === "login" && offline && (
+          <p className="rounded-md bg-primary-50 p-3 text-sm text-primary-700">
+            Backend is offline — using built-in demo mode.
+          </p>
         )}
         <Button fullWidth loading={loading}>
           {mode === "forgot" ? "Send reset link" : mode === "otp" ? (code ? "Verify OTP" : "Send OTP") : "Continue"}
@@ -278,6 +276,12 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
   const [description, setDescription] = React.useState("");
   const [city, setCity] = React.useState("");
   const [status, setStatus] = React.useState<"draft" | "published" | "paused">("draft");
+  const [extensionAllowed, setExtensionAllowed] = React.useState(false);
+  const [extensionPricing, setExtensionPricing] = React.useState<"same" | "custom">("same");
+  const [extensionRatePercent, setExtensionRatePercent] = React.useState("20");
+  const [extensionRequestBefore, setExtensionRequestBefore] = React.useState("12");
+  const [extensionMaxDays, setExtensionMaxDays] = React.useState("3");
+  const [extensionTouched, setExtensionTouched] = React.useState(false);
   const [selectedPhoto, setSelectedPhoto] = React.useState<{ id: number; file: File; url: string } | null>(null);
   const nextPhotoId = React.useRef(0);
   const [existingPhotos, setExistingPhotos] = React.useState<Listing["photos"]>([]);
@@ -303,6 +307,12 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
         setCity(listing.location?.city ?? "");
         setStatus(listing.status);
         setExistingPhotos(listing.photos ?? []);
+        setExtensionAllowed(!!listing.extension?.allowed);
+        setExtensionPricing(listing.extension?.pricing === "custom" ? "custom" : "same");
+        setExtensionRatePercent(String(listing.extension?.ratePercent ?? 20));
+        setExtensionRequestBefore(String(listing.extension?.requestBeforeHours ?? 12));
+        setExtensionMaxDays(String(listing.extension?.maxExtensionDays ?? 3));
+        setExtensionTouched(!!listing.extension);
       } catch (err) {
         if (!cancelled) setError(errorMessage(err));
       } finally {
@@ -384,6 +394,13 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
         securityDeposit: Number(securityDeposit || 0),
         description,
         location: city ? { city } : undefined,
+        extension: {
+          allowed: extensionAllowed,
+          pricing: extensionPricing,
+          ratePercent: Number(extensionRatePercent) || 0,
+          requestBeforeHours: Number(extensionRequestBefore) || 0,
+          maxExtensionDays: Number(extensionMaxDays) || 0,
+        },
         status: publish ? ("published" as const) : status,
       };
       if (edit && listingId) {
@@ -412,10 +429,24 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
     }
   };
 
+  const basicsComplete = title.trim().length >= 3 && description.trim().length >= 10;
+  const pricingComplete = Number(pricePerDay) > 0;
+  const photosComplete = !!selectedPhoto || existingPhotos.length > 0;
+
   return (
     <div className="space-y-6">
       <Stepper
-        current={1}
+        current={
+          !basicsComplete
+            ? 0
+            : !pricingComplete
+              ? 1
+              : !extensionTouched
+                ? 2
+                : !photosComplete
+                  ? 3
+                  : 4
+        }
         steps={[
           { id: "basics", title: "Basics" },
           { id: "pricing", title: "Pricing" },
@@ -513,7 +544,14 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
               Give renters the flexibility to extend their rental before it ends.
             </p>
           </div>
-          <Checkbox defaultChecked label="Allow Extension" />
+          <Checkbox
+            checked={extensionAllowed}
+            onChange={(e) => {
+              setExtensionAllowed(e.target.checked);
+              setExtensionTouched(true);
+            }}
+            label="Allow Extension"
+          />
         </div>
         <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_320px]">
           <div className="space-y-5">
@@ -521,8 +559,11 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
               <p className="mb-2 text-sm font-medium">Extension Pricing</p>
               <RadioGroup
                 name="extension-pricing"
-                value="custom"
-                onChange={() => undefined}
+                value={extensionPricing}
+                onChange={(v) => {
+                  setExtensionPricing(v as "same" | "custom");
+                  setExtensionTouched(true);
+                }}
                 options={[
                   { value: "same", label: "Same as normal rate" },
                   { value: "custom", label: "Custom extension rate, higher than normal rate" },
@@ -530,10 +571,24 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
               />
             </div>
             <div className="grid gap-4 md:grid-cols-3">
-              <Input label="Extension Daily Rate" defaultValue="20" rightIcon={<span className="text-xs font-semibold">%</span>} />
+              <Input
+                label="Extension Daily Rate"
+                type="number"
+                min={0}
+                value={extensionRatePercent}
+                onChange={(e) => {
+                  setExtensionRatePercent(e.target.value);
+                  setExtensionTouched(true);
+                }}
+                rightIcon={<span className="text-xs font-semibold">%</span>}
+              />
               <Select
                 label="Request Before"
-                defaultValue="12"
+                value={extensionRequestBefore}
+                onChange={(e) => {
+                  setExtensionRequestBefore(e.target.value);
+                  setExtensionTouched(true);
+                }}
                 options={[
                   { value: "6", label: "6 hours before booking ends" },
                   { value: "12", label: "12 hours before booking ends" },
@@ -542,7 +597,11 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
               />
               <Select
                 label="Maximum Extension Period"
-                defaultValue="3"
+                value={extensionMaxDays}
+                onChange={(e) => {
+                  setExtensionMaxDays(e.target.value);
+                  setExtensionTouched(true);
+                }}
                 options={[
                   { value: "1", label: "1 day" },
                   { value: "3", label: "3 days" },

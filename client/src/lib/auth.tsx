@@ -53,13 +53,13 @@ const DEMO_USER: MockUser = {
   updatedAt: new Date().toISOString(),
 };
 
-// Default admin account — mirrors the backend seed (admin@gmail.com / admin)
+// Default admin account — mirrors the backend seed (admin@idlex.com / admin12345)
 // so the admin console works in offline demo mode too.
 const ADMIN_DEMO_USER: MockUser = {
   _id: "mock-admin-user",
   name: "Admin",
-  email: "admin@gmail.com",
-  password: "admin",
+  email: "admin@idlex.com",
+  password: "admin12345",
   role: "admin",
   isOwner: true,
   isRenter: true,
@@ -99,7 +99,11 @@ function saveMockUsers(users: MockUser[]): void {
 }
 
 function seedMockUsers(): void {
-  const users = getMockUsers();
+  // Drop the legacy demo admin (admin@gmail.com / admin) left in older
+  // localStorage stores — the backend seeds admin@idlex.com / admin12345,
+  // and a mock session for an account the backend doesn't know silently
+  // breaks the admin console.
+  const users = getMockUsers().filter((u) => !(u.email === "admin@gmail.com" && u.password === "admin"));
   for (const demo of [DEMO_USER, ADMIN_DEMO_USER]) {
     if (!users.some((u) => u.email === demo.email)) users.push(demo);
   }
@@ -112,7 +116,7 @@ function mockLogin(email: string, password: string): User {
     (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password
   );
   if (!match) {
-    throw new Error("Invalid email or password. Offline accounts: admin@gmail.com / admin · demo@idlex.com / demo1234");
+    throw new Error("Invalid email or password.");
   }
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password: _pw, ...safe } = match;

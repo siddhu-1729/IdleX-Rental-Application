@@ -24,6 +24,19 @@ const availabilitySchema = new mongoose.Schema(
   { _id: true }
 );
 
+// Owner-controlled rental extension rules. When `allowed` is true renters
+// can extend a booking before it ends, subject to the listed constraints.
+const extensionSchema = new mongoose.Schema(
+  {
+    allowed: { type: Boolean, default: false },
+    pricing: { type: String, enum: ['same', 'custom'], default: 'same' },
+    ratePercent: { type: Number, default: 20, min: 0 },
+    requestBeforeHours: { type: Number, default: 12, min: 0 },
+    maxExtensionDays: { type: Number, default: 3, min: 0 },
+  },
+  { _id: false }
+);
+
 const listingSchema = new mongoose.Schema(
   {
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
@@ -46,6 +59,8 @@ const listingSchema = new mongoose.Schema(
 
     photos: [photoSchema],
     availability: [availabilitySchema],
+
+    extension: { type: extensionSchema, default: () => ({}) },
 
     status: {
       type: String,

@@ -124,13 +124,14 @@ export default function Home() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
           {categoryStats.slice(0, 6).map((category) => {
             const Icon = categoryIcons[category.name as keyof typeof categoryIcons] ?? Package;
+            const count = stats ? stats.listingsByCategory?.find((row) => row.category === category.slug)?.count ?? 0 : category.count;
             return (
             <Link key={category.slug} href={`${ROUTES.SEARCH}?category=${category.slug}`} className="rounded-xl border border-border bg-white p-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md">
               <span className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-primary-50 text-primary">
                 <Icon size={22} />
               </span>
               <p className="mt-3 font-semibold">{category.name}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{category.count.toLocaleString("en-IN")}+ items</p>
+              <p className="mt-1 text-xs text-muted-foreground">{count.toLocaleString("en-IN")}+ items</p>
             </Link>
           )})}
         </div>
