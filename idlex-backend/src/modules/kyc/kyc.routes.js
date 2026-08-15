@@ -7,7 +7,13 @@ const router = express.Router();
 
 router.use(protect);
 router.get('/', controller.getMyKyc);
-router.post('/step/:step', upload.single('file'), controller.submitStep);
-router.post('/submit', controller.finalizeSubmission);
+router.post(
+  '/submit',
+  upload.fields([
+    { name: 'file', maxCount: 1 },
+    { name: 'selfie', maxCount: 1 },
+  ]),
+  controller.submitKyc
+);
 
 module.exports = router;

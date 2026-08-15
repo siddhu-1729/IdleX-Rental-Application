@@ -10,6 +10,9 @@ import { ROUTES } from "@/lib/constants";
 
 export function TopBar({ onMenuClick, title }: { onMenuClick?: () => void; title?: string }) {
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const messagesHref = isAdmin ? ROUTES.ADMIN_MESSAGES : ROUTES.MESSAGES;
+  const notificationsHref = isAdmin ? ROUTES.ADMIN : ROUTES.NOTIFICATIONS;
   const { data: unread } = useFetchData<{ count: number }>("/api/notifications/unread-count", []);
   const unreadCount = unread?.count ?? 0;
   return (
@@ -36,10 +39,10 @@ export function TopBar({ onMenuClick, title }: { onMenuClick?: () => void; title
       </div>
 
       <div className="ml-auto flex items-center gap-1">
-        <Link href="/messages" className="relative h-10 w-10 inline-flex items-center justify-center rounded-full hover:bg-muted">
+        <Link href={messagesHref} className="relative h-10 w-10 inline-flex items-center justify-center rounded-full hover:bg-muted">
           <MessageCircle size={20} />
         </Link>
-        <Link href="/notifications" className="relative h-10 w-10 inline-flex items-center justify-center rounded-full hover:bg-muted">
+        <Link href={notificationsHref} className="relative h-10 w-10 inline-flex items-center justify-center rounded-full hover:bg-muted">
           <Bell size={20} />
           {unreadCount > 0 && (
             <span className="absolute top-1.5 right-1.5 h-4 min-w-4 px-1 text-[10px] font-bold rounded-full bg-danger text-white flex items-center justify-center">

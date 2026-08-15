@@ -98,8 +98,8 @@ export const AUTH_PAGES = ["/login", "/register", "/sign-up", "/forgot-password"
 export const KYC_STATUS = {
   NOT_STARTED: "not_started",
   IN_PROGRESS: "in_progress",
-  PENDING_REVIEW: "pending_review",
-  VERIFIED: "verified",
+  PENDING_REVIEW: "pending",
+  APPROVED: "approved",
   REJECTED: "rejected",
 } as const;
 export type KycStatus = (typeof KYC_STATUS)[keyof typeof KYC_STATUS];

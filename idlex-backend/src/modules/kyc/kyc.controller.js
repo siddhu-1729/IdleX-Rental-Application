@@ -10,66 +10,46 @@ const getMyKyc = asyncHandler(async (req, res) => {
   return new ApiResponse(200, kyc, 'KYC status').send(res);
 });
 
-// Each step POST just updates fields on the one KycSubmission row —
-// same save-and-resume pattern the Django doc calls for.
-const submitStep = asyncHandler(async (req, res) => {
-  const { step } = req.params;
-  const validSteps = ['id-upload', 'selfie', 'bank-details'];
-  if (!validSteps.includes(step)) throw ApiError.badRequest('Unknown KYC step');
+// Single-step submission: the user uploads their password-protected
+// E-Aadhaar ZIP (downloaded from the e-Aadhaar website), the password
+// that unlocks it, and a live selfie captured at submission time. All
+// three go to the admin for review.
+const submitKyc = asyncHandler(async (req, res) => {
+  const files = req.files || {};
+  if (!files.file || !files.file[0]) throw ApiError.badRequest('E-Aadhaar ZIP file is required');
+  if (!files.selfie || !files.selfie[0]) throw ApiError.badRequest('A live selfie is required');
+  if (!req.body.password || !String(req.body.password).trim()) {
+    throw ApiError.badRequest('The password for your E-Aadhaar ZIP is required');
+  }
 
   let kyc = await Kyc.findOne({ user: req.user._id });
   if (!kyc) kyc = await Kyc.create({ user: req.user._id });
 
-  if (step === 'id-upload') {
-    if (!req.file) throw ApiError.badRequest('ID document file is required');
-    kyc.idDocument = {
-      type: req.body.documentType || 'national_id',
-      fileUrl: `/uploads/${req.file.filename}`,
-      uploadedAt: new Date(),
-    };
-    kyc.currentStep = 'selfie';
-  } else if (step === 'selfie') {
-    if (!req.file) throw ApiError.badRequest('Selfie file is required');
-    kyc.selfie = { fileUrl: `/uploads/${req.file.filename}`, uploadedAt: new Date() };
-    kyc.currentStep = 'bank-details';
-  } else if (step === 'bank-details') {
-    const { accountHolderName, accountNumber, ifscOrRoutingNumber, bankName } = req.body;
-    kyc.bankDetails = { accountHolderName, accountNumber, ifscOrRoutingNumber, bankName };
-    kyc.currentStep = 'completed';
-  }
-
-  kyc.status = 'in_progress';
-  await kyc.save();
-  logAudit({
-    actor: req.user._id,
-    action: 'kyc.step_saved',
-    category: 'kyc',
-    resourceType: 'kyc',
-    resourceId: kyc._id.toString(),
-    summary: `Saved KYC step '${step}'`,
-    req,
-  });
-  return new ApiResponse(200, kyc, `Step '${step}' saved`).send(res);
-});
-
-const finalizeSubmission = asyncHandler(async (req, res) => {
-  const kyc = await Kyc.findOne({ user: req.user._id });
-  if (!kyc) throw ApiError.notFound('No KYC submission found');
-  if (!kyc.idDocument?.fileUrl || !kyc.selfie?.fileUrl || !kyc.bankDetails?.accountNumber) {
-    throw ApiError.badRequest('All KYC steps must be completed before submitting');
-  }
+  kyc.eAadhaar = {
+    fileUrl: `/uploads/${files.file[0].filename}`,
+    password: String(req.body.password).trim(),
+    uploadedAt: new Date(),
+  };
+  kyc.selfie = {
+    fileUrl: `/uploads/${files.selfie[0].filename}`,
+    uploadedAt: new Date(),
+  };
   kyc.status = 'pending';
+  kyc.rejectionReason = null;
+  kyc.reviewedBy = null;
+  kyc.reviewedAt = null;
   await kyc.save();
+
   logAudit({
     actor: req.user._id,
     action: 'kyc.submitted',
     category: 'kyc',
     resourceType: 'kyc',
     resourceId: kyc._id.toString(),
-    summary: 'Submitted KYC for review',
+    summary: 'Submitted E-Aadhaar ZIP and live selfie for KYC review',
     req,
   });
   return new ApiResponse(200, kyc, 'KYC submitted for review').send(res);
 });
 
-module.exports = { getMyKyc, submitStep, finalizeSubmission };
+module.exports = { getMyKyc, submitKyc };

@@ -154,21 +154,13 @@ export type PayoutSettings = {
 };
 
 export type KycStatus = "not_started" | "in_progress" | "pending" | "approved" | "rejected";
-export type KycStep = "id-upload" | "selfie" | "bank-details" | "completed";
 
 export type Kyc = {
   _id: string;
   user: string | Pick<User, "_id" | "name" | "email" | "phone">;
   status: KycStatus;
-  currentStep: KycStep;
-  idDocument?: { type?: string; fileUrl?: string; uploadedAt?: string };
+  eAadhaar?: { fileUrl?: string; password?: string; uploadedAt?: string };
   selfie?: { fileUrl?: string; uploadedAt?: string };
-  bankDetails?: {
-    accountHolderName?: string;
-    accountNumber?: string;
-    ifscOrRoutingNumber?: string;
-    bankName?: string;
-  };
   rejectionReason?: string | null;
   reviewedBy?: string | null;
   reviewedAt?: string | null;

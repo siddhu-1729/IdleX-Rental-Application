@@ -669,15 +669,13 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
 
 export function KycStepperForm() {
   const [kyc, setKyc] = React.useState<Kyc | null>(null);
-  const [documentType, setDocumentType] = React.useState("aadhaar");
-  const [idFile, setIdFile] = React.useState<File | null>(null);
-  const [idPreviewUrl, setIdPreviewUrl] = React.useState<string | null>(null);
+  const [zipFile, setZipFile] = React.useState<File | null>(null);
+  const [zipPassword, setZipPassword] = React.useState("");
+  const [cameraStatus, setCameraStatus] = React.useState<"idle" | "requesting" | "ready" | "unsupported">("idle");
   const [selfieFile, setSelfieFile] = React.useState<File | null>(null);
   const [selfiePreviewUrl, setSelfiePreviewUrl] = React.useState<string | null>(null);
-  const [accountHolderName, setAccountHolderName] = React.useState("");
-  const [accountNumber, setAccountNumber] = React.useState("");
-  const [ifscOrRoutingNumber, setIfscOrRoutingNumber] = React.useState("");
-  const [bankName, setBankName] = React.useState("");
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const streamRef = React.useRef<MediaStream | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -699,60 +697,92 @@ export function KycStepperForm() {
     };
   }, []);
 
+  // Camera is only opened when the user clicks "Enable Camera" — never
+  // automatically when the form loads.
+  const startCamera = async () => {
+    if (cameraStatus === "ready" || cameraStatus === "requesting") return;
+    setError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus("unsupported");
+      return;
+    }
+    setCameraStatus("requesting");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setCameraStatus("ready");
+    } catch {
+      setCameraStatus("unsupported");
+    }
+  };
+
   React.useEffect(() => {
     return () => {
-      if (idPreviewUrl) URL.revokeObjectURL(idPreviewUrl);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    };
+  }, []);
+
+  const captureSelfie = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) {
+      setError("Camera is not ready yet. Wait for the preview, then capture.");
+      return;
+    }
+    setError(null);
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setError("Could not capture the selfie. Try again.");
+        return;
+      }
+      if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
+      const file = new File([blob], "live-selfie.png", { type: "image/png" });
+      setSelfieFile(file);
+      setSelfiePreviewUrl(URL.createObjectURL(file));
+    }, "image/png");
+  };
+
+  const retakeSelfie = () => {
+    if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
+    setSelfieFile(null);
+    setSelfiePreviewUrl(null);
+  };
+
+  React.useEffect(() => {
+    return () => {
       if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const pickIdFile = (file: File | null) => {
-    if (idPreviewUrl) URL.revokeObjectURL(idPreviewUrl);
-    setIdFile(file);
-    setIdPreviewUrl(file ? URL.createObjectURL(file) : null);
-  };
-
-  const pickSelfieFile = (file: File | null) => {
-    if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
-    setSelfieFile(file);
-    setSelfiePreviewUrl(file ? URL.createObjectURL(file) : null);
-  };
-
-  const uploadStep = async (step: "id-upload" | "selfie") => {
-    const file = step === "id-upload" ? idFile : selfieFile;
-    if (!file) {
-      setError(step === "id-upload" ? "Select an ID document to upload" : "Select a selfie to upload");
+  const submit = async () => {
+    if (!zipFile) {
+      setError("Select your E-Aadhaar ZIP file to upload");
+      return;
+    }
+    if (!zipPassword.trim()) {
+      setError("Enter the password that unlocks your E-Aadhaar ZIP");
+      return;
+    }
+    if (!selfieFile) {
+      setError("Capture a live selfie to complete KYC");
       return;
     }
     setError(null);
+    setNotice(null);
     setLoading(true);
     try {
       const form = new FormData();
-      form.append("file", file);
-      if (step === "id-upload") form.append("documentType", documentType);
-      const data = await api.post<Kyc>(`/api/kyc/step/${step}`, form, { headers: {} });
+      form.append("file", zipFile);
+      form.append("password", zipPassword.trim());
+      form.append("selfie", selfieFile);
+      const data = await api.post<Kyc>("/api/kyc/submit", form, { headers: {} });
       setKyc(data);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const submitBankDetails = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const data = await api.post<Kyc>("/api/kyc/step/bank-details", {
-        accountHolderName,
-        accountNumber,
-        ifscOrRoutingNumber,
-        bankName,
-      });
-      setKyc(data);
-      const submitted = await api.post<Kyc>("/api/kyc/submit", {});
-      setKyc(submitted);
       setNotice("Submitted for review. We'll notify you once it's verified.");
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
@@ -767,17 +797,13 @@ export function KycStepperForm() {
 
   return (
     <div className="space-y-6">
-      <Stepper
-        current={kyc?.currentStep === "bank-details" || kyc?.currentStep === "completed" ? 3 : kyc?.currentStep === "selfie" ? 2 : 1}
-        steps={[
-          { id: "identity", title: "Identity" },
-          { id: "selfie", title: "Selfie" },
-          { id: "bank", title: "Bank" },
-          { id: "review", title: "Review" },
-        ]}
-      />
       {kyc && kyc.status === "approved" && (
         <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">Your KYC is approved.</p>
+      )}
+      {kyc && kyc.status === "pending" && (
+        <p className="rounded-md bg-accent-50 p-3 text-sm text-accent-700">
+          Your E-Aadhaar verification is under review. You&apos;ll be able to list items once an admin approves it.
+        </p>
       )}
       {kyc && kyc.status === "rejected" && (
         <p className="rounded-md bg-danger-50 p-3 text-sm text-danger">
@@ -785,68 +811,76 @@ export function KycStepperForm() {
         </p>
       )}
       <div className="grid gap-4 rounded-lg border border-border bg-card p-5 md:grid-cols-2">
-        <Select
-          label="ID type"
-          value={documentType}
-          onChange={(e) => setDocumentType(e.target.value)}
-          options={[
-            { value: "aadhaar", label: "Aadhaar" },
-            { value: "pan", label: "PAN" },
-            { value: "passport", label: "Passport" },
-            { value: "national_id", label: "National ID" },
-          ]}
+        <div className="md:col-span-2">
+          <p className="text-sm leading-6 text-muted-foreground">
+            Download your E-Aadhaar as a <strong>password-protected ZIP</strong> from the official
+            e-Aadhaar website (uidai.gov.in), then upload it here along with its password and a{" "}
+            <strong>live selfie</strong> taken right now. Our team will review it and approve your
+            KYC, after which you can list items.
+          </p>
+        </div>
+        <Input
+          label="E-Aadhaar ZIP file"
+          type="file"
+          accept=".zip,application/zip,application/x-zip-compressed"
+          onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
         />
         <Input
-          label="ID document (photo/PDF)"
-          type="file"
-          accept="image/*,.pdf"
-          onChange={(e) => pickIdFile(e.target.files?.[0] ?? null)}
+          label="ZIP password"
+          type="password"
+          value={zipPassword}
+          onChange={(e) => setZipPassword(e.target.value)}
+          placeholder="Password used to open the E-Aadhaar ZIP"
         />
-        {idPreviewUrl && (
-          <div className="md:col-span-2 -mt-2">
-            <p className="mb-1 text-xs font-medium text-muted-foreground">Preview</p>
-            {idFile?.type.startsWith("image/") ? (
-              <div className="max-w-md overflow-hidden rounded-md border border-border bg-white shadow-sm">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={idPreviewUrl} alt={idFile?.name ?? "ID document"} className="max-h-72 w-full object-contain" />
-              </div>
-            ) : (
-              <div className="flex h-32 max-w-md items-center justify-center rounded-md border border-border bg-muted px-4 text-sm text-muted-foreground">
-                {idFile?.name ?? "Document"} (PDF)
-              </div>
+        <div className="md:col-span-2">
+          <p className="mb-2 text-sm font-medium">Live selfie</p>
+          {cameraStatus === "idle" && (
+            <div className="rounded-md border border-dashed border-border bg-muted p-4">
+              <p className="text-sm text-muted-foreground">
+                A live selfie taken with your webcam is required. Your camera stays off until you
+                allow it.
+              </p>
+              <Button variant="outline" className="mt-3" onClick={() => void startCamera()}>
+                Enable Camera
+              </Button>
+            </div>
+          )}
+          {cameraStatus === "requesting" && (
+            <p className="rounded-md bg-muted p-4 text-sm text-muted-foreground">
+              Requesting camera access — allow it in your browser prompt…
+            </p>
+          )}
+          {cameraStatus === "unsupported" && (
+            <p className="rounded-md bg-danger-50 p-4 text-sm text-danger">
+              Camera not supported — no webcam was detected or access was denied. A live selfie is
+              required to complete KYC, so submission is disabled until a camera is available.
+            </p>
+          )}
+          {cameraStatus === "ready" && !selfiePreviewUrl && (
+            <div className="max-w-md overflow-hidden rounded-md border border-border bg-black">
+              <video ref={videoRef} autoPlay playsInline muted className="aspect-video w-full object-cover" />
+            </div>
+          )}
+          {selfiePreviewUrl && (
+            <div className="max-w-md overflow-hidden rounded-md border border-border bg-white shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={selfiePreviewUrl} alt="Captured live selfie" className="max-h-72 w-full object-contain" />
+            </div>
+          )}
+          <div className="mt-3 flex gap-2">
+            {cameraStatus === "ready" && !selfieFile && (
+              <Button variant="outline" onClick={captureSelfie}>Capture Selfie</Button>
+            )}
+            {selfieFile && (
+              <Button variant="outline" onClick={retakeSelfie}>Retake</Button>
             )}
           </div>
-        )}
-        <Input
-          label="Selfie photo"
-          type="file"
-          accept="image/*"
-          onChange={(e) => pickSelfieFile(e.target.files?.[0] ?? null)}
-        />
-        {selfiePreviewUrl && (
-          <div className="md:-mt-2">
-            <p className="mb-1 text-xs font-medium text-muted-foreground">Preview</p>
-            <div className="max-w-sm overflow-hidden rounded-md border border-border bg-white shadow-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={selfiePreviewUrl} alt="Selfie" className="max-h-60 w-full object-contain" />
-            </div>
-          </div>
-        )}
-        <Input label="Account holder" value={accountHolderName} onChange={(e) => setAccountHolderName(e.target.value)} placeholder="Name as on bank account" />
-        <Input label="Account number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="Bank account number" />
-        <Input label="IFSC" value={ifscOrRoutingNumber} onChange={(e) => setIfscOrRoutingNumber(e.target.value)} placeholder="HDFC0001234" />
-        <Input label="Bank name" value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="HDFC Bank" />
+        </div>
       </div>
       <FieldError message={error} />
       {notice && <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">{notice}</p>}
       <div className="flex justify-end gap-3">
-        <Button variant="outline" loading={loading} onClick={() => uploadStep("id-upload")}>
-          Save ID Step
-        </Button>
-        <Button variant="outline" loading={loading} onClick={() => uploadStep("selfie")}>
-          Save Selfie
-        </Button>
-        <Button loading={loading} onClick={() => submitBankDetails()}>
+        <Button loading={loading} disabled={cameraStatus === "unsupported"} onClick={() => submit()}>
           Submit for Review
         </Button>
       </div>

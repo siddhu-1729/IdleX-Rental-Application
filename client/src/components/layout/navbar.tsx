@@ -30,6 +30,7 @@ export function Navbar() {
   );
   const signedIn = mounted && (!!user || !!getToken());
   const isHost = mounted && signedIn && hasListings;
+  const isAdmin = user?.role === "admin";
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-border">
@@ -82,9 +83,11 @@ export function Navbar() {
               </Link>
             </>
           )}
-          <Link href={isHost ? ROUTES.LISTING_NEW : ROUTES.BECOME_HOST} className="hidden md:inline-flex">
-            <Button variant="primary" size="sm">{isHost ? "Add another listing" : "Become a Host"}</Button>
-          </Link>
+          {!isAdmin && (
+            <Link href={isHost ? ROUTES.LISTING_NEW : ROUTES.BECOME_HOST} className="hidden md:inline-flex">
+              <Button variant="primary" size="sm">{isHost ? "Add another listing" : "Become a Host"}</Button>
+            </Link>
+          )}
 
           {/* User menu */}
           {signedIn ? (
@@ -105,12 +108,20 @@ export function Navbar() {
                     <p className="text-sm font-semibold">{user?.name ?? "Account"}</p>
                     <p className="text-xs text-muted-foreground">{user?.email}</p>
                   </div>
-                  <MenuLink href={ROUTES.DASHBOARD} icon={<LayoutDashboard size={16} />}>Dashboard</MenuLink>
-                  <MenuLink href={ROUTES.WISHLIST} icon={<Heart size={16} />}>Wishlist</MenuLink>
-                  <MenuLink href={ROUTES.MY_LISTINGS} icon={<Settings size={16} />}>My Listings</MenuLink>
-                  <MenuLink href={ROUTES.MY_RENTALS} icon={<User size={16} />}>My Bookings</MenuLink>
-                  <MenuLink href={ROUTES.PROFILE} icon={<User size={16} />}>Profile</MenuLink>
-                  <MenuLink href={ROUTES.SETTINGS} icon={<Settings size={16} />}>Settings</MenuLink>
+                  {isAdmin ? (
+                    <>
+                      <MenuLink href={ROUTES.ADMIN} icon={<LayoutDashboard size={16} />}>Admin Console</MenuLink>
+                    </>
+                  ) : (
+                    <>
+                      <MenuLink href={ROUTES.DASHBOARD} icon={<LayoutDashboard size={16} />}>Dashboard</MenuLink>
+                      <MenuLink href={ROUTES.WISHLIST} icon={<Heart size={16} />}>Wishlist</MenuLink>
+                      <MenuLink href={ROUTES.MY_LISTINGS} icon={<Settings size={16} />}>My Listings</MenuLink>
+                      <MenuLink href={ROUTES.MY_RENTALS} icon={<User size={16} />}>My Bookings</MenuLink>
+                      <MenuLink href={ROUTES.PROFILE} icon={<User size={16} />}>Profile</MenuLink>
+                      <MenuLink href={ROUTES.SETTINGS} icon={<Settings size={16} />}>Settings</MenuLink>
+                    </>
+                  )}
                   <hr className="my-2 border-border" />
                   <button
                     className="flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-muted"

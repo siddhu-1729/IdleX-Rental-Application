@@ -15,7 +15,8 @@ export function DashboardShell({
 }) {
   const [open, setOpen] = React.useState(false);
   const { user } = useAuth();
-  const role = user?.isOwner || user?.role === "owner" || user?.role === "admin" ? "owner" : "renter";
+  const role =
+    user?.role === "admin" ? "admin" : user?.isOwner || user?.role === "owner" ? "owner" : "renter";
 
   return (
     <div className="min-h-screen bg-muted">

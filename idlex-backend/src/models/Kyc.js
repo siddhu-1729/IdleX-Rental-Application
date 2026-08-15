@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 
-// One row per user, updated in place as each stepper step completes —
-// same "save-and-resume on one record" pattern as the Django doc.
+// One row per user, updated in place each time the user submits KYC.
+// The only accepted proof of identity is the password-protected E-Aadhaar
+// ZIP downloaded from the UIDAI e-Aadhaar portal. The password the user
+// provides unlocks the ZIP for the admin reviewer.
 const kycSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
@@ -11,26 +13,17 @@ const kycSchema = new mongoose.Schema(
       enum: ['not_started', 'in_progress', 'pending', 'approved', 'rejected'],
       default: 'not_started',
     },
-    currentStep: {
-      type: String,
-      enum: ['id-upload', 'selfie', 'bank-details', 'completed'],
-      default: 'id-upload',
-    },
 
-    idDocument: {
-      type: { type: String }, // passport, national_id, driving_license
+    eAadhaar: {
       fileUrl: String,
+      password: String,
       uploadedAt: Date,
     },
+    // Live selfie captured at submission time — the admin compares it with
+    // the photo inside the E-Aadhaar ZIP before approving.
     selfie: {
       fileUrl: String,
       uploadedAt: Date,
-    },
-    bankDetails: {
-      accountHolderName: String,
-      accountNumber: String,
-      ifscOrRoutingNumber: String,
-      bankName: String,
     },
 
     rejectionReason: { type: String, default: null },

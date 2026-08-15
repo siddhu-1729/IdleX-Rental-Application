@@ -1,6 +1,7 @@
 const express = require('express');
 const controller = require('./bookings.controller');
 const { protect } = require('../../middlewares/auth.middleware');
+const { requireApprovedKyc } = require('../../middlewares/kyc.middleware');
 const validate = require('../../middlewares/validate.middleware');
 const {
   createBookingSchema,
@@ -14,7 +15,9 @@ const router = express.Router();
 router.use(protect);
 
 router.get('/', controller.myBookings); // renter view
-router.post('/', validate(createBookingSchema), controller.createBooking);
+// Creating a booking requires an admin-approved KYC — same restriction as
+// adding listings. Until approved the account is view-only.
+router.post('/', requireApprovedKyc, validate(createBookingSchema), controller.createBooking);
 router.get('/owner', controller.ownerBookings);
 router.get('/:id', controller.getBooking);
 router.post('/:id/confirm', controller.confirmBooking);

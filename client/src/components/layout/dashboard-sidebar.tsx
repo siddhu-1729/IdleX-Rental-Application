@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LogOut, X } from "@/components/ui/icons";
 import { ICONS } from "@/components/ui/icons";
-import { RENTER_SIDEBAR, OWNER_SIDEBAR } from "@/config/navigation";
+import { ADMIN_SIDEBAR, RENTER_SIDEBAR, OWNER_SIDEBAR } from "@/config/navigation";
 import { ROUTES } from "@/lib/constants";
 import { useAuth } from "@/lib/auth";
 
@@ -21,14 +21,17 @@ export function DashboardSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const isAdmin = user?.role === "admin";
   const isOwner = user?.isOwner || user?.role === "owner" || user?.role === "admin";
-  const items = isOwner ? OWNER_SIDEBAR : RENTER_SIDEBAR;
+  // Admins only see admin routes — user routes are not displayed.
+  const items = isAdmin ? ADMIN_SIDEBAR : isOwner ? OWNER_SIDEBAR : RENTER_SIDEBAR;
+  const homeHref = isAdmin ? ROUTES.ADMIN : ROUTES.DASHBOARD;
 
   return (
     <aside className="h-full flex flex-col bg-white border-r border-border w-64">
       {/* Brand */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-border">
-        <Link href={ROUTES.DASHBOARD} className="flex items-center gap-2">
+        <Link href={homeHref} className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center text-white font-bold text-sm">
             iX
           </div>

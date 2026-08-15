@@ -10,7 +10,7 @@ import { Input, Select } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/formatters";
 import { api } from "@/lib/api-client";
 import { useFetchData } from "@/lib/use-fetch-data";
-import { useAuth, errorMessage } from "@/lib/auth";
+import { useAuth, errorMessage, RequireKyc } from "@/lib/auth";
 import { listingImage } from "@/lib/api-types";
 import type { Booking, Listing, Payment } from "@/lib/api-types";
 import { ROUTES } from "@/lib/constants";
@@ -72,7 +72,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
   };
 
   return (
-    <PublicShell>
+    <RequireKyc>
+      <PublicShell>
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-5">
           <h1 className="text-3xl font-bold">Checkout</h1>
@@ -109,5 +110,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
         </Card>
       </section>
     </PublicShell>
+    </RequireKyc>
   );
 }

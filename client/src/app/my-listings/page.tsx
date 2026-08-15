@@ -9,11 +9,13 @@ import { RequireAuth, errorMessage } from "@/lib/auth";
 import { useFetchData } from "@/lib/use-fetch-data";
 import { api } from "@/lib/api-client";
 import { toCard } from "@/lib/api-types";
-import type { Listing } from "@/lib/api-types";
+import type { Kyc, Listing } from "@/lib/api-types";
 import { ROUTES } from "@/lib/constants";
 
 function MyListingsInner() {
   const { data, isLoading, error, refetch } = useFetchData<Listing[]>("/api/listings/mine/all", []);
+  const { data: kyc } = useFetchData<Kyc>("/api/kyc", []);
+  const kycApproved = kyc?.status === "approved";
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
 
@@ -51,8 +53,20 @@ function MyListingsInner() {
           <h1 className="text-2xl font-bold">My Listings</h1>
           <p className="text-sm text-muted-foreground">Manage pricing, availability, photos, and booking readiness.</p>
         </div>
-        <Link href={ROUTES.LISTING_NEW}><Button>Add Listing</Button></Link>
+        {kycApproved ? (
+          <Link href={ROUTES.LISTING_NEW}><Button>Add Listing</Button></Link>
+        ) : (
+          <Link href={ROUTES.KYC} title="Your KYC must be approved by an admin before you can add listings">
+            <Button variant="outline" disabled>Add Listing — KYC Pending</Button>
+          </Link>
+        )}
       </div>
+      {!kycApproved && (
+        <p className="mb-4 rounded-md bg-accent-50 p-3 text-sm text-accent-700">
+          Listing is disabled until your KYC is approved by an admin.{' '}
+          <Link href={ROUTES.KYC} className="font-semibold underline">Complete KYC verification</Link>.
+        </p>
+      )}
       {error && <p className="mb-4 rounded-md bg-danger-50 p-3 text-sm text-danger">{error.message}</p>}
       {actionError && <p className="mb-4 rounded-md bg-danger-50 p-3 text-sm text-danger">{actionError}</p>}
       {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
@@ -67,8 +81,17 @@ function MyListingsInner() {
       </div>
       {!isLoading && !error && (data ?? []).length === 0 && (
         <p className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          You haven&apos;t listed anything yet.{' '}
-          <Link href={ROUTES.LISTING_NEW} className="font-semibold text-primary">Create your first listing</Link>.
+          {kycApproved ? (
+            <>
+              You haven&apos;t listed anything yet.{' '}
+              <Link href={ROUTES.LISTING_NEW} className="font-semibold text-primary">Create your first listing</Link>.
+            </>
+          ) : (
+            <>
+              You haven&apos;t listed anything yet. Your account is view-only until your KYC is approved.{' '}
+              <Link href={ROUTES.KYC} className="font-semibold text-primary">Complete KYC verification</Link>.
+            </>
+          )}
         </p>
       )}
     </DashboardShell>

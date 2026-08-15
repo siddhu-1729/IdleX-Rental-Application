@@ -542,7 +542,7 @@ export function AdminBookingsPage() {
             {(data?.items ?? []).map((b) => (
               <tr key={b._id}>
                 <Td className="max-w-55">
-                  <span className="truncate">{typeof b.listing === "object" ? b.listing.title : "Listing"}</span>
+                  <span className="truncate">{b.listing && typeof b.listing === "object" ? b.listing.title : "Listing"}</span>
                 </Td>
                 <Td>{person(b.renter)}</Td>
                 <Td>{person(b.owner)}</Td>
@@ -616,7 +616,7 @@ export function AdminPaymentsPage() {
           <tbody>
             {(data?.items ?? []).map((p) => (
               <tr key={p._id}>
-                <Td>{typeof p.payer === "object" ? p.payer.name : "User"}</Td>
+                <Td>{p.payer && typeof p.payer === "object" ? p.payer.name : "User"}</Td>
                 <Td>
                   <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{p.gatewayOrderId}</code>
                 </Td>
@@ -722,7 +722,7 @@ export function AdminListingsPage() {
             {(data ?? []).map((listing) => (
               <tr key={listing._id}>
                 <Td>{listing.title}</Td>
-                <Td>{typeof listing.owner === "object" ? listing.owner.name : "Owner"}</Td>
+                <Td>{listing.owner && typeof listing.owner === "object" ? listing.owner.name : "Owner"}</Td>
                 <Td>{formatCurrency(listing.pricePerDay)}</Td>
                 <Td><Badge variant={listing.status === "published" ? "success" : "warning"}>{listing.status}</Badge></Td>
                 <Td>
@@ -772,7 +772,7 @@ export function AdminDisputesPage() {
             {(data ?? []).map((dispute) => (
               <tr key={dispute._id}>
                 <Td>{dispute.reason}</Td>
-                <Td>{typeof dispute.raisedBy === "object" ? dispute.raisedBy.name : "User"}</Td>
+                <Td>{dispute.raisedBy && typeof dispute.raisedBy === "object" ? dispute.raisedBy.name : "User"}</Td>
                 <Td><Badge variant={dispute.status === "open" ? "danger" : dispute.status === "resolved" ? "success" : "warning"}>{dispute.status}</Badge></Td>
                 <Td>{dispute.status !== "resolved" && <Button size="sm" onClick={() => resolve(dispute._id)}>Resolve</Button>}</Td>
               </tr>
@@ -797,7 +797,9 @@ export function AdminKycPage() {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">KYC Verification</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Approve identity, address, bank, and higher-value rental checks.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Users upload a password-protected E-Aadhaar ZIP plus a live selfie. Download the ZIP, unlock it with the provided password, compare the selfie with the Aadhaar photo, then approve or reject.
+          </p>
         </div>
       </div>
       <AdminError error={error} />
@@ -807,7 +809,9 @@ export function AdminKycPage() {
           <thead>
             <tr>
               <Th>User</Th>
-              <Th>Step</Th>
+              <Th>Live Selfie</Th>
+              <Th>E-Aadhaar ZIP</Th>
+              <Th>ZIP Password</Th>
               <Th>Status</Th>
               <Th>Submitted</Th>
               <Th>Action</Th>
@@ -816,8 +820,27 @@ export function AdminKycPage() {
           <tbody>
             {(data ?? []).map((kyc) => (
               <tr key={kyc._id}>
-                <Td>{typeof kyc.user === "object" ? `${kyc.user.name} (${kyc.user.email})` : kyc.user}</Td>
-                <Td>{kyc.currentStep}</Td>
+                <Td>{kyc.user && typeof kyc.user === "object" ? `${kyc.user.name} (${kyc.user.email})` : kyc.user ?? "User"}</Td>
+                <Td>
+                  {kyc.selfie?.fileUrl ? (
+                    <a href={kyc.selfie.fileUrl} target="_blank" rel="noreferrer" title="Open selfie">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={kyc.selfie.fileUrl} alt="Live selfie" className="h-10 w-10 rounded-md border border-border object-cover" />
+                    </a>
+                  ) : (
+                    "—"
+                  )}
+                </Td>
+                <Td>
+                  {kyc.eAadhaar?.fileUrl ? (
+                    <a href={kyc.eAadhaar.fileUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">
+                      Download ZIP
+                    </a>
+                  ) : (
+                    "—"
+                  )}
+                </Td>
+                <Td>{kyc.eAadhaar?.password ? <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{kyc.eAadhaar.password}</code> : "—"}</Td>
                 <Td><Badge variant={kyc.status === "approved" ? "success" : kyc.status === "rejected" ? "danger" : kyc.status === "pending" ? "warning" : "default"}>{kyc.status}</Badge></Td>
                 <Td>{formatDate(kyc.createdAt)}</Td>
                 <Td>
@@ -863,7 +886,7 @@ export function AdminReportsPage() {
             {(data ?? []).map((report) => (
               <tr key={report._id}>
                 <Td>{report.reason}</Td>
-                <Td>{typeof report.raisedBy === "object" ? report.raisedBy.name : "User"}</Td>
+                <Td>{report.raisedBy && typeof report.raisedBy === "object" ? report.raisedBy.name : "User"}</Td>
                 <Td><Badge variant={report.status === "open" ? "danger" : "success"}>{report.status}</Badge></Td>
               </tr>
             ))}

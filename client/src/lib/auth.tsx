@@ -3,7 +3,7 @@
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api, getToken, getStoredUser, setStoredUser, setToken, clearAuth, ApiError } from "@/lib/api-client";
-import type { AuthResult, User } from "@/lib/api-types";
+import type { AuthResult, Kyc, User } from "@/lib/api-types";
 import { ROUTES, PUBLIC_ROUTES, AUTH_PAGES } from "@/lib/constants";
 
 type AuthContextValue = {
@@ -336,6 +336,47 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   }, [user, isAuthPage, mounted, router]);
 
   if (!isPublic && (!mounted || !user)) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-muted">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
+/**
+ * KYC gate. Blocks the listing form (and any other wrapped page) until
+ * the user's KYC verification has been approved — anyone who hasn't
+ * completed it is redirected to /kyc to finish it first.
+ */
+export function RequireKyc({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const mounted = useIsMounted();
+  const [verified, setVerified] = React.useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+    api
+      .get<Kyc>("/api/kyc")
+      .then((kyc) => {
+        if (cancelled) return;
+        const approved = kyc.status === "approved";
+        setVerified(approved);
+        if (!approved) router.replace(ROUTES.KYC);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setVerified(false);
+        router.replace(ROUTES.KYC);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted, router]);
+
+  if (!mounted || verified !== true) {
     return (
       <div className="grid min-h-screen place-items-center bg-muted">
         <p className="text-sm text-muted-foreground">Loading…</p>

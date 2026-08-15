@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/marketplace/dashboard-shell";
 import { Avatar } from "@/components/ui/avatar";
@@ -9,18 +10,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RequireAuth, useAuth, errorMessage } from "@/lib/auth";
 import { api } from "@/lib/api-client";
-import type { User } from "@/lib/api-types";
+import type { Kyc, User } from "@/lib/api-types";
 import { ROUTES } from "@/lib/constants";
 
 function ProfileInner() {
   const router = useRouter();
   const { user, refreshUser } = useAuth();
+  const [kyc, setKyc] = React.useState<Kyc | null>(null);
   const [name, setName] = React.useState(user?.name ?? "");
   const [phone, setPhone] = React.useState(user?.phone ?? "");
   const [email] = React.useState(user?.email ?? "");
   const [message, setMessage] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    api
+      .get<Kyc>("/api/kyc")
+      .then((data) => {
+        if (!cancelled) setKyc(data);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const save = async () => {
     setError(null);
@@ -44,8 +59,20 @@ function ProfileInner() {
           <Avatar name={user?.name ?? "User"} size="xl" />
           <div>
             <h1 className="text-2xl font-bold">{user?.name}</h1>
-            <Badge variant={user?.role === "admin" ? "success" : "default"}>{user?.role}</Badge>
-            <Badge variant={user?.isOwner ? "warning" : "secondary"}>{user?.isOwner ? "Owner" : "Renter"}</Badge>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <Badge variant={user?.role === "admin" ? "success" : "default"}>{user?.role}</Badge>
+              <Badge variant={user?.isOwner ? "warning" : "secondary"}>{user?.isOwner ? "Owner" : "Renter"}</Badge>
+              <Badge
+                variant={kyc?.status === "approved" ? "success" : kyc?.status === "pending" ? "warning" : "secondary"}
+              >
+                KYC {kyc?.status === "approved" ? "Approved" : kyc?.status === "pending" ? "Pending Review" : kyc?.status === "rejected" ? "Rejected" : "Not Verified"}
+              </Badge>
+              {kyc && kyc.status !== "approved" && (
+                <Link href={ROUTES.KYC} className="text-sm font-semibold text-primary hover:underline">
+                  Complete KYC
+                </Link>
+              )}
+            </div>
           </div>
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
