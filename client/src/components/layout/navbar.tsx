@@ -21,8 +21,6 @@ export function Navbar() {
   const [open, setOpen] = React.useState(false);
   const [menu, setMenu] = React.useState(false);
 
-  // localStorage is not available during SSR, so the auth state can only
-  // be trusted after mount — avoids a hydration mismatch on public pages.
   const mounted = React.useSyncExternalStore(
     () => () => {},
     () => true,
@@ -33,40 +31,46 @@ export function Navbar() {
   const isAdmin = user?.role === "admin";
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-border">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 h-16 flex items-center gap-4">
+    <header className="sticky top-0 z-40 border-b border-border bg-white/80 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
         {/* Logo */}
-        
-          <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center text-white font-bold text-sm">
+        <Link href={ROUTES.HOME} className="group flex shrink-0 items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-linear-to-br from-primary to-violet-600 text-sm font-bold text-white shadow-sm shadow-primary/30 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
             iX
           </div>
-          <span className="text-lg font-bold text-foreground tracking-tight">
-            Idle<span className="text-primary">X</span>
+          <span className="text-lg font-bold tracking-tight text-foreground">
+            Idle<span className="bg-linear-to-r from-primary to-violet-600 bg-clip-text text-transparent">X</span>
           </span>
-       
+        </Link>
 
         {/* Home (desktop) */}
-        <Link href={ROUTES.HOME} className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <Link
+          href={ROUTES.HOME}
+          className="hidden items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground sm:flex"
+        >
           <Home size={16} />
           Home
         </Link>
 
         {/* Location (desktop) */}
-        <button className="hidden lg:flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <button className="hidden items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground lg:flex">
           <MapPin size={16} />
           India
           <ChevronDown size={14} />
         </button>
 
         {/* Search (desktop) */}
-        <div className="hidden md:flex flex-1 max-w-xl mx-4">
-          <form action={ROUTES.SEARCH} className="relative w-full">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <div className="mx-4 hidden max-w-xl flex-1 md:flex">
+          <form action={ROUTES.SEARCH} className="group relative w-full">
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary"
+            />
             <input
               name="q"
               type="text"
               placeholder="Search for items (camera, tent, bike...)"
-              className="w-full h-10 pl-10 pr-4 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              className="h-10 w-full rounded-lg border border-border bg-muted/40 pl-10 pr-4 text-sm transition-all duration-200 focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
           </form>
         </div>
@@ -75,17 +79,29 @@ export function Navbar() {
         <div className="ml-auto flex items-center gap-2">
           {signedIn && (
             <>
-              <Link href={ROUTES.MESSAGES} className="hidden sm:inline-flex relative h-10 w-10 items-center justify-center rounded-full hover:bg-muted">
+              <Link
+                href={ROUTES.MESSAGES}
+                className="relative hidden h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-primary-50 hover:text-primary sm:inline-flex"
+              >
                 <MessageCircle size={20} />
               </Link>
-              <Link href={ROUTES.NOTIFICATIONS} className="hidden sm:inline-flex relative h-10 w-10 items-center justify-center rounded-full hover:bg-muted">
+              <Link
+                href={ROUTES.NOTIFICATIONS}
+                className="relative hidden h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-primary-50 hover:text-primary sm:inline-flex"
+              >
                 <Bell size={20} />
               </Link>
             </>
           )}
           {!isAdmin && (
             <Link href={isHost ? ROUTES.LISTING_NEW : ROUTES.BECOME_HOST} className="hidden md:inline-flex">
-              <Button variant="primary" size="sm">{isHost ? "Add another listing" : "Become a Host"}</Button>
+              <Button
+                variant="primary"
+                size="sm"
+                className="shadow-sm shadow-primary/20 transition-transform hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/30"
+              >
+                {isHost ? "Add another listing" : "Become a Host"}
+              </Button>
             </Link>
           )}
 
@@ -94,24 +110,22 @@ export function Navbar() {
             <div className="relative">
               <button
                 onClick={() => setMenu((m) => !m)}
-                className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border border-border hover:shadow-md transition-shadow"
+                className="flex items-center gap-2 rounded-full border border-border py-1 pl-1 pr-2 transition-all duration-200 hover:border-primary/40 hover:shadow-md hover:shadow-primary/10"
               >
                 <Menu size={16} />
                 <Avatar name={user?.name ?? "User"} size="sm" />
               </button>
               {menu && (
                 <div
-                  className="absolute right-0 mt-2 w-64 rounded-xl border border-border bg-card shadow-lg p-2 z-50"
+                  className="absolute right-0 z-50 mt-2 w-64 origin-top-right animate-[menuIn_0.15s_ease-out] rounded-xl border border-border bg-card p-2 shadow-lg shadow-black/5"
                   onClick={() => setMenu(false)}
                 >
-                  <div className="p-3 border-b border-border mb-2">
+                  <div className="mb-2 border-b border-border p-3">
                     <p className="text-sm font-semibold">{user?.name ?? "Account"}</p>
                     <p className="text-xs text-muted-foreground">{user?.email}</p>
                   </div>
                   {isAdmin ? (
-                    <>
-                      <MenuLink href={ROUTES.ADMIN} icon={<LayoutDashboard size={16} />}>Admin Console</MenuLink>
-                    </>
+                    <MenuLink href={ROUTES.ADMIN} icon={<LayoutDashboard size={16} />}>Admin Console</MenuLink>
                   ) : (
                     <>
                       <MenuLink href={ROUTES.DASHBOARD} icon={<LayoutDashboard size={16} />}>Dashboard</MenuLink>
@@ -124,7 +138,7 @@ export function Navbar() {
                   )}
                   <hr className="my-2 border-border" />
                   <button
-                    className="flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-muted"
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-red-50 hover:text-red-600"
                     onClick={() => { logout(); router.push(ROUTES.HOME); }}
                   >
                     <span className="text-muted-foreground"><LogOut size={16} /></span>
@@ -135,7 +149,9 @@ export function Navbar() {
             </div>
           ) : (
             <Link href={ROUTES.LOGIN}>
-              <Button variant="outline" size="sm">Sign in</Button>
+              <Button variant="outline" size="sm" className="transition-transform hover:-translate-y-0.5">
+                Sign in
+              </Button>
             </Link>
           )}
         </div>
@@ -143,27 +159,29 @@ export function Navbar() {
         {/* Mobile menu toggle */}
         <button
           onClick={() => setOpen((o) => !o)}
-          className="md:hidden h-10 w-10 inline-flex items-center justify-center rounded-md hover:bg-muted"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md transition-colors hover:bg-muted md:hidden"
         >
-          {open ? <X size={20} /> : <Menu size={20} />}
+          <span className="transition-transform duration-200" style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}>
+            {open ? <X size={20} /> : <Menu size={20} />}
+          </span>
         </button>
       </div>
 
       {/* Mobile dropdown nav */}
       {open && (
-        <div className="md:hidden border-t border-border bg-white px-4 py-3 space-y-2">
+        <div className="animate-[fadeInDown_0.2s_ease-out] space-y-2 border-t border-border bg-white px-4 py-3 md:hidden">
           <form action={ROUTES.SEARCH} className="relative">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               name="q"
               type="text"
               placeholder="Search for items..."
-              className="w-full h-10 pl-10 pr-4 rounded-lg border border-border text-sm"
+              className="h-10 w-full rounded-lg border border-border bg-muted/40 pl-10 pr-4 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
           </form>
           <Link
             href={ROUTES.HOME}
-            className="flex items-center gap-2 px-3 py-2 text-sm rounded-md text-foreground hover:bg-muted"
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
           >
             <span className="text-muted-foreground"><Home size={16} /></span>
             Home
@@ -172,13 +190,24 @@ export function Navbar() {
             <Link
               key={item.label}
               href={item.href}
-              className="block px-3 py-2 text-sm rounded-md text-foreground hover:bg-muted"
+              className="block rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
             >
               {item.label}
             </Link>
           ))}
         </div>
       )}
+
+      <style jsx global>{`
+        @keyframes menuIn {
+          from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes fadeInDown {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </header>
   );
 }
@@ -189,7 +218,7 @@ function MenuLink({
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-muted"
+      className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
     >
       <span className="text-muted-foreground">{icon}</span>
       {children}

@@ -8,7 +8,9 @@ import { Input, Select, Textarea } from "@/components/ui/input";
 import { Stepper } from "@/components/ui/stepper";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox, RadioGroup } from "@/components/ui/form-controls";
-import { Clock, Mail, Repeat, Upload } from "@/components/ui/icons";
+import {
+  AlertTriangle, Camera, CheckCircle, Clock, IdCard, Lock, Mail, Repeat, ShieldCheck, Upload,
+} from "@/components/ui/icons";
 import { api, ApiError, getStoredUser, setStoredUser } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import type { Kyc, Listing, User } from "@/lib/api-types";
@@ -17,7 +19,22 @@ import { errorMessage, isNetworkError } from "@/lib/auth";
 
 function FieldError({ message }: { message: string | null }) {
   if (!message) return null;
-  return <p className="rounded-md bg-danger-50 p-3 text-sm text-danger">{message}</p>;
+  return (
+    <div className="flex animate-[fadeInUp_0.25s_ease-out] items-start gap-3 rounded-lg border border-danger-200 bg-danger-50 p-3">
+      <AlertTriangle size={16} className="mt-0.5 shrink-0 text-danger" />
+      <p className="text-sm text-danger">{message}</p>
+    </div>
+  );
+}
+
+function Notice({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <div className="flex animate-[fadeInUp_0.25s_ease-out] items-start gap-3 rounded-lg border border-secondary-200 bg-secondary-50 p-3">
+      <CheckCircle size={16} className="mt-0.5 shrink-0 text-secondary-700" />
+      <p className="text-sm text-secondary-700">{message}</p>
+    </div>
+  );
 }
 
 export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "otp" }) {
@@ -87,10 +104,18 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-sm">
+    <form
+      onSubmit={handleSubmit}
+      className="mx-auto w-full max-w-md animate-[fadeInUp_0.4s_ease-out] rounded-xl border border-border bg-card p-7 shadow-lg shadow-black/5"
+    >
       <div className="mb-6">
-        <Badge variant="default">Secure access</Badge>
-        <h1 className="mt-3 text-2xl font-bold">{titles[mode]}</h1>
+        <div className="flex items-center gap-2">
+          <Badge variant="default" className="bg-linear-to-r from-primary to-violet-600 text-white">
+            Secure access
+          </Badge>
+          <Lock size={14} className="text-muted-foreground" />
+        </div>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight">{titles[mode]}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {mode === "otp" ? "Enter your phone number to receive a code." : "Sign in to your IdleX account."}
         </p>
@@ -111,33 +136,44 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
           <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter password" required />
         )}
         <FieldError message={error} />
-        {notice && <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">{notice}</p>}
+        <Notice message={notice} />
         {mode === "login" && offline && (
-          <p className="rounded-md bg-primary-50 p-3 text-sm text-primary-700">
-            Backend is offline — using built-in demo mode.
-          </p>
+          <div className="flex items-start gap-3 rounded-lg border border-primary-200 bg-primary-50 p-3">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-primary-700" />
+            <p className="text-sm text-primary-700">Backend is offline — using built-in demo mode.</p>
+          </div>
         )}
-        <Button fullWidth loading={loading}>
+        <Button
+          fullWidth
+          loading={loading}
+          className="shadow-sm shadow-primary/20 transition-transform hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/30"
+        >
           {mode === "forgot" ? "Send reset link" : mode === "otp" ? (code ? "Verify OTP" : "Send OTP") : "Continue"}
         </Button>
         <div className="flex items-center justify-between text-sm">
           {mode === "login" && (
             <>
-              <Link href={ROUTES.FORGOT_PASSWORD} className="font-semibold text-primary">
+              <Link href={ROUTES.FORGOT_PASSWORD} className="font-semibold text-primary transition-colors hover:text-violet-600">
                 Forgot password?
               </Link>
-              <Link href={ROUTES.REGISTER} className="font-semibold text-primary">
+              <Link href={ROUTES.REGISTER} className="font-semibold text-primary transition-colors hover:text-violet-600">
                 Create account
               </Link>
             </>
           )}
           {mode === "sign-up" && (
-            <Link href={ROUTES.LOGIN} className="ml-auto font-semibold text-primary">
+            <Link href={ROUTES.LOGIN} className="ml-auto font-semibold text-primary transition-colors hover:text-violet-600">
               Already registered? Sign in
             </Link>
           )}
         </div>
       </div>
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </form>
   );
 }
@@ -210,14 +246,20 @@ export function EmailVerifyPanel({ initialEmail = "" }: { initialEmail?: string 
         if (!codeSent) void sendCode();
         else void verify();
       }}
-      className="mx-auto w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-sm"
+      className="mx-auto w-full max-w-md animate-[fadeInUp_0.4s_ease-out] rounded-xl border border-border bg-card p-7 shadow-lg shadow-black/5"
     >
       <div className="mb-6">
         <div className="flex items-center gap-2">
-          <Badge variant="default">Email verification</Badge>
-          <Mail size={16} className="text-primary" />
+          <Badge variant="default" className="bg-linear-to-r from-primary to-violet-600 text-white">
+            Email verification
+          </Badge>
         </div>
-        <h1 className="mt-3 text-2xl font-bold">Verify your email</h1>
+        <div className="mt-3 flex items-center gap-2.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary-50 text-primary">
+            <Mail size={17} />
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight">Verify your email</h1>
+        </div>
         <p className="mt-2 text-sm text-muted-foreground">
           We&apos;ll send a one-time code to this address so we know it&apos;s really you.
         </p>
@@ -242,8 +284,12 @@ export function EmailVerifyPanel({ initialEmail = "" }: { initialEmail?: string 
           />
         )}
         <FieldError message={error} />
-        {notice && <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">{notice}</p>}
-        <Button fullWidth loading={loading}>
+        <Notice message={notice} />
+        <Button
+          fullWidth
+          loading={loading}
+          className="shadow-sm shadow-primary/20 transition-transform hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/30"
+        >
           {codeSent ? "Verify Email" : "Send Code"}
         </Button>
         {codeSent && (
@@ -251,13 +297,13 @@ export function EmailVerifyPanel({ initialEmail = "" }: { initialEmail?: string 
             type="button"
             onClick={() => void sendCode()}
             disabled={loading}
-            className="mx-auto block text-sm font-semibold text-primary hover:underline"
+            className="mx-auto block text-sm font-semibold text-primary transition-colors hover:text-violet-600 hover:underline"
           >
             Resend code
           </button>
         )}
         <div className="flex items-center justify-center text-sm">
-          <Link href={ROUTES.HOME} className="font-semibold text-primary">
+          <Link href={ROUTES.HOME} className="font-semibold text-primary transition-colors hover:text-violet-600">
             Skip for now
           </Link>
         </div>
@@ -434,7 +480,7 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
   const photosComplete = !!selectedPhoto || existingPhotos.length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="animate-[fadeInUp_0.4s_ease-out] space-y-6">
       <Stepper
         current={
           !basicsComplete
@@ -455,7 +501,7 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
           { id: "review", title: "Review" },
         ]}
       />
-      <div className="grid gap-4 rounded-lg border border-border bg-card p-5 md:grid-cols-2">
+      <div className="grid gap-4 rounded-xl border border-border bg-card p-6 shadow-sm md:grid-cols-2">
         <Input label="Item title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Camera, bike, drill..." required />
         <Select
           label="Category"
@@ -479,7 +525,7 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
         <div className="md:col-span-2">
           <label className="mb-2 block text-sm font-medium">Photos</label>
           <div className="flex flex-wrap items-start gap-4">
-            <label className="inline-flex h-24 w-24 shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-border bg-muted px-3 text-center text-xs font-medium text-muted-foreground transition hover:border-primary hover:bg-primary-50 hover:text-primary">
+            <label className="inline-flex h-24 w-24 shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-border bg-muted/50 px-3 text-center text-xs font-medium text-muted-foreground transition-all duration-200 hover:border-primary hover:bg-primary-50 hover:text-primary hover:shadow-sm">
               <Upload size={18} className="mx-auto" />
               <span>Upload</span>
               <input
@@ -495,26 +541,28 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
             </label>
 
             {selectedPhoto ? (
-              <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+              <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-white shadow-md shadow-black/5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={selectedPhoto.url} alt={selectedPhoto.file.name} className="max-h-80 w-full object-cover" />
-                <span className="absolute bottom-2 left-2 max-w-[calc(100%-5.5rem)] truncate rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white">
+                <span className="absolute bottom-2 left-2 max-w-[calc(100%-5.5rem)] truncate rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
                   {selectedPhoto.file.name}
                 </span>
                 <button
                   type="button"
                   aria-label="Remove photo"
                   onClick={removePhoto}
-                  className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border border-white/40 bg-black/60 text-sm font-semibold leading-none text-white transition hover:bg-danger"
+                  className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border border-white/40 bg-black/60 text-sm font-semibold leading-none text-white backdrop-blur-sm transition-all hover:scale-110 hover:bg-danger"
                 >
                   ×
                 </button>
               </div>
             ) : existingPhotos.length > 0 ? (
-              <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+              <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-white shadow-md shadow-black/5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={existingPhotos[0].url} alt={existingPhotos[0].caption || "listing photo"} className="max-h-80 w-full object-cover" />
-                <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white">Current photo</span>
+                <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                  Current photo
+                </span>
               </div>
             ) : (
               <p className="self-center text-sm text-muted-foreground">
@@ -526,18 +574,25 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
               <div className="flex w-full flex-wrap gap-2">
                 {existingPhotos.slice(1).map((p) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={p._id} src={p.url} alt={p.caption || "listing photo"} className="h-16 w-16 rounded-lg border border-border object-cover" />
+                  <img
+                    key={p._id}
+                    src={p.url}
+                    alt={p.caption || "listing photo"}
+                    className="h-16 w-16 rounded-lg border border-border object-cover transition-transform hover:scale-105"
+                  />
                 ))}
               </div>
             )}
           </div>
         </div>
       </div>
-      <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
           <div>
             <div className="flex items-center gap-2">
-              <Repeat className="text-primary" />
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary-50 text-primary">
+                <Repeat size={16} />
+              </span>
               <h2 className="text-lg font-semibold">Rental Extension Setting</h2>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -610,7 +665,7 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
               />
             </div>
           </div>
-          <div className="rounded-lg bg-primary-50 p-4">
+          <div className="rounded-xl bg-linear-to-br from-primary-50 to-violet-50 p-4">
             <div className="flex items-center gap-2 text-primary">
               <Clock size={18} />
               <span className="text-sm font-semibold">Live renter preview</span>
@@ -623,7 +678,7 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
         </div>
       </div>
       {otpSent && !edit && (
-        <div className="rounded-lg border border-primary-200 bg-primary-50 p-5">
+        <div className="animate-[fadeInUp_0.3s_ease-out] rounded-xl border border-primary-200 bg-linear-to-br from-primary-50 to-violet-50 p-6">
           <div className="flex items-center gap-2 text-primary">
             <Mail size={18} />
             <span className="text-sm font-semibold">Email OTP verification</span>
@@ -650,19 +705,32 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
         </div>
       )}
       <FieldError message={error} />
-      {notice && <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">{notice}</p>}
+      <Notice message={notice} />
       {loadingListing ? (
-        <p className="text-sm text-muted-foreground">Loading listing…</p>
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading listing…</p>
+        </div>
       ) : (
         <div className="flex justify-end gap-3">
-          <Button variant="outline" loading={loading} onClick={() => submit(false)}>
+          <Button variant="outline" loading={loading} onClick={() => submit(false)} className="transition-transform hover:-translate-y-0.5">
             {edit ? "Save Changes" : "Save Draft"}
           </Button>
-          <Button loading={loading} onClick={() => submit(true)}>
+          <Button
+            loading={loading}
+            onClick={() => submit(true)}
+            className="shadow-sm shadow-primary/20 transition-transform hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/30"
+          >
             {edit ? "Publish Changes" : "Publish Listing"}
           </Button>
         </div>
       )}
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -796,22 +864,32 @@ export function KycStepperForm() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="animate-[fadeInUp_0.4s_ease-out] space-y-6">
       {kyc && kyc.status === "approved" && (
-        <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">Your KYC is approved.</p>
+        <div className="flex items-start gap-3 rounded-lg border border-secondary-200 bg-secondary-50 p-4">
+          <CheckCircle size={18} className="mt-0.5 shrink-0 text-secondary-700" />
+          <p className="text-sm text-secondary-700">Your KYC is approved.</p>
+        </div>
       )}
       {kyc && kyc.status === "pending" && (
-        <p className="rounded-md bg-accent-50 p-3 text-sm text-accent-700">
-          Your E-Aadhaar verification is under review. You&apos;ll be able to list items once an admin approves it.
-        </p>
+        <div className="flex items-start gap-3 rounded-lg border border-accent-200 bg-accent-50 p-4">
+          <Clock size={18} className="mt-0.5 shrink-0 text-accent-700" />
+          <p className="text-sm text-accent-700">
+            Your E-Aadhaar verification is under review. You&apos;ll be able to list items once an admin approves it.
+          </p>
+        </div>
       )}
       {kyc && kyc.status === "rejected" && (
-        <p className="rounded-md bg-danger-50 p-3 text-sm text-danger">
-          KYC rejected: {kyc.rejectionReason || "Please resubmit your details."}
-        </p>
+        <div className="flex items-start gap-3 rounded-lg border border-danger-200 bg-danger-50 p-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-danger" />
+          <p className="text-sm text-danger">
+            KYC rejected: {kyc.rejectionReason || "Please resubmit your details."}
+          </p>
+        </div>
       )}
-      <div className="grid gap-4 rounded-lg border border-border bg-card p-5 md:grid-cols-2">
-        <div className="md:col-span-2">
+      <div className="grid gap-4 rounded-xl border border-border bg-card p-6 shadow-sm md:grid-cols-2">
+        <div className="md:col-span-2 flex items-start gap-3 rounded-lg bg-muted/50 p-4">
+          <ShieldCheck size={18} className="mt-0.5 shrink-0 text-primary" />
           <p className="text-sm leading-6 text-muted-foreground">
             Download your E-Aadhaar as a <strong>password-protected ZIP</strong> from the official
             e-Aadhaar website (uidai.gov.in), then upload it here along with its password and a{" "}
@@ -819,12 +897,19 @@ export function KycStepperForm() {
             KYC, after which you can list items.
           </p>
         </div>
-        <Input
-          label="E-Aadhaar ZIP file"
-          type="file"
-          accept=".zip,application/zip,application/x-zip-compressed"
-          onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
-        />
+        <div>
+          <p className="mb-1.5 text-sm font-medium">E-Aadhaar ZIP file</p>
+          <label className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-md border-2 border-dashed border-border bg-muted/50 px-3 text-sm font-medium text-muted-foreground transition-all duration-200 hover:border-primary hover:bg-primary-50 hover:text-primary hover:shadow-sm">
+            <Upload size={16} className="shrink-0" />
+            <span className="truncate">{zipFile ? zipFile.name : "Upload ZIP file"}</span>
+            <input
+              type="file"
+              accept=".zip,application/zip,application/x-zip-compressed"
+              className="hidden"
+              onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+        </div>
         <Input
           label="ZIP password"
           type="password"
@@ -833,57 +918,84 @@ export function KycStepperForm() {
           placeholder="Password used to open the E-Aadhaar ZIP"
         />
         <div className="md:col-span-2">
-          <p className="mb-2 text-sm font-medium">Live selfie</p>
+          <div className="mb-2 flex items-center gap-2">
+            <IdCard size={16} className="text-muted-foreground" />
+            <p className="text-sm font-medium">Live selfie</p>
+          </div>
           {cameraStatus === "idle" && (
-            <div className="rounded-md border border-dashed border-border bg-muted p-4">
-              <p className="text-sm text-muted-foreground">
-                A live selfie taken with your webcam is required. Your camera stays off until you
-                allow it.
-              </p>
-              <Button variant="outline" className="mt-3" onClick={() => void startCamera()}>
+            <div className="rounded-lg border-2 border-dashed border-border bg-muted/50 p-5">
+              <div className="flex items-start gap-3">
+                <Camera size={20} className="mt-0.5 shrink-0 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  A live selfie taken with your webcam is required. Your camera stays off until you
+                  allow it.
+                </p>
+              </div>
+              <Button variant="outline" className="mt-3 transition-transform hover:-translate-y-0.5" onClick={() => void startCamera()}>
                 Enable Camera
               </Button>
             </div>
           )}
           {cameraStatus === "requesting" && (
-            <p className="rounded-md bg-muted p-4 text-sm text-muted-foreground">
-              Requesting camera access — allow it in your browser prompt…
-            </p>
+            <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-4">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <p className="text-sm text-muted-foreground">
+                Requesting camera access — allow it in your browser prompt…
+              </p>
+            </div>
           )}
           {cameraStatus === "unsupported" && (
-            <p className="rounded-md bg-danger-50 p-4 text-sm text-danger">
-              Camera not supported — no webcam was detected or access was denied. A live selfie is
-              required to complete KYC, so submission is disabled until a camera is available.
-            </p>
+            <div className="flex items-start gap-3 rounded-lg border border-danger-200 bg-danger-50 p-4">
+              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-danger" />
+              <p className="text-sm text-danger">
+                Camera not supported — no webcam was detected or access was denied. A live selfie is
+                required to complete KYC, so submission is disabled until a camera is available.
+              </p>
+            </div>
           )}
           {cameraStatus === "ready" && !selfiePreviewUrl && (
-            <div className="max-w-md overflow-hidden rounded-md border border-border bg-black">
+            <div className="max-w-md overflow-hidden rounded-xl border border-border bg-black shadow-md">
               <video ref={videoRef} autoPlay playsInline muted className="aspect-video w-full object-cover" />
             </div>
           )}
           {selfiePreviewUrl && (
-            <div className="max-w-md overflow-hidden rounded-md border border-border bg-white shadow-sm">
+            <div className="max-w-md overflow-hidden rounded-xl border border-border bg-white shadow-md shadow-black/5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={selfiePreviewUrl} alt="Captured live selfie" className="max-h-72 w-full object-contain" />
             </div>
           )}
           <div className="mt-3 flex gap-2">
             {cameraStatus === "ready" && !selfieFile && (
-              <Button variant="outline" onClick={captureSelfie}>Capture Selfie</Button>
+              <Button variant="outline" onClick={captureSelfie} className="transition-transform hover:-translate-y-0.5">
+                Capture Selfie
+              </Button>
             )}
             {selfieFile && (
-              <Button variant="outline" onClick={retakeSelfie}>Retake</Button>
+              <Button variant="outline" onClick={retakeSelfie} className="transition-transform hover:-translate-y-0.5">
+                Retake
+              </Button>
             )}
           </div>
         </div>
       </div>
       <FieldError message={error} />
-      {notice && <p className="rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">{notice}</p>}
+      <Notice message={notice} />
       <div className="flex justify-end gap-3">
-        <Button loading={loading} disabled={cameraStatus === "unsupported"} onClick={() => submit()}>
+        <Button
+          loading={loading}
+          disabled={cameraStatus === "unsupported"}
+          onClick={() => submit()}
+          className="shadow-sm shadow-primary/20 transition-transform hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/30"
+        >
           Submit for Review
         </Button>
       </div>
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
