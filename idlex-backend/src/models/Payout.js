@@ -23,6 +23,7 @@ const payoutSettingsSchema = new mongoose.Schema(
     accountNumber: String,
     ifscOrRoutingNumber: String,
     bankName: String,
+    upiId: String,
   },
   { timestamps: true }
 );

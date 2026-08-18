@@ -9,6 +9,26 @@ function daysBetween(start, end) {
   return Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24));
 }
 
+// Single source of truth for the price breakdown — used both when a
+// booking is created directly and when a Razorpay checkout order is
+// created for the same listing + dates.
+function computeCost(listing, startDate, endDate) {
+  const totalDays = daysBetween(startDate, endDate);
+  if (totalDays < 1) throw ApiError.badRequest('endDate must be after startDate');
+
+  const subtotal = totalDays * listing.pricePerDay;
+  const serviceFee = Math.round(subtotal * SERVICE_FEE_RATE);
+  const securityDeposit = listing.securityDeposit || 0;
+
+  return {
+    totalDays,
+    subtotal,
+    serviceFee,
+    securityDeposit,
+    totalAmount: subtotal + serviceFee + securityDeposit,
+  };
+}
+
 // Preventing double-booking on overlapping dates: checked against both
 // the listing's blocked availability and existing active bookings —
 // same overlap-check pattern used for listing availability itself.
@@ -45,12 +65,7 @@ async function createBooking(renterId, { listingId, startDate, endDate }) {
     throw ApiError.forbidden('You cannot book your own listing');
   }
 
-  const totalDays = daysBetween(startDate, endDate);
-  if (totalDays < 1) throw ApiError.badRequest('endDate must be after startDate');
-
-  const subtotal = totalDays * listing.pricePerDay;
-  const serviceFee = Math.round(subtotal * SERVICE_FEE_RATE);
-  const totalAmount = subtotal + serviceFee + (listing.securityDeposit || 0);
+  const cost = computeCost(listing, startDate, endDate);
 
   const booking = await Booking.create({
     listing: listing._id,
@@ -59,11 +74,11 @@ async function createBooking(renterId, { listingId, startDate, endDate }) {
     startDate,
     endDate,
     pricePerDay: listing.pricePerDay,
-    totalDays,
-    subtotal,
-    serviceFee,
-    securityDeposit: listing.securityDeposit || 0,
-    totalAmount,
+    totalDays: cost.totalDays,
+    subtotal: cost.subtotal,
+    serviceFee: cost.serviceFee,
+    securityDeposit: cost.securityDeposit,
+    totalAmount: cost.totalAmount,
   });
 
   // The owner who posted the item gets notified that a renter wants it.
@@ -92,4 +107,4 @@ function formatDate(date) {
   return new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-module.exports = { assertDatesAvailable, createBooking, daysBetween };
+module.exports = { assertDatesAvailable, createBooking, daysBetween, computeCost };

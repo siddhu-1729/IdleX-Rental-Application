@@ -812,6 +812,7 @@ export function AdminKycPage() {
               <Th>Live Selfie</Th>
               <Th>E-Aadhaar ZIP</Th>
               <Th>ZIP Password</Th>
+              <Th>Bank Details</Th>
               <Th>Status</Th>
               <Th>Submitted</Th>
               <Th>Action</Th>
@@ -841,6 +842,17 @@ export function AdminKycPage() {
                   )}
                 </Td>
                 <Td>{kyc.eAadhaar?.password ? <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{kyc.eAadhaar.password}</code> : "—"}</Td>
+                <Td>
+                  {kyc.bankDetails?.accountNumber ? (
+                    <div className="text-xs">
+                      <p className="font-semibold">{kyc.bankDetails.accountHolderName}</p>
+                      <p className="text-muted-foreground">{kyc.bankDetails.bankName} • {kyc.bankDetails.ifsc}</p>
+                      <p className="text-muted-foreground">••••{kyc.bankDetails.accountNumber.slice(-4)}{kyc.bankDetails.upiId ? ` • ${kyc.bankDetails.upiId}` : ""}</p>
+                    </div>
+                  ) : (
+                    "—"
+                  )}
+                </Td>
                 <Td><Badge variant={kyc.status === "approved" ? "success" : kyc.status === "rejected" ? "danger" : kyc.status === "pending" ? "warning" : "default"}>{kyc.status}</Badge></Td>
                 <Td>{formatDate(kyc.createdAt)}</Td>
                 <Td>

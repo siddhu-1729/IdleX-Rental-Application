@@ -744,6 +744,11 @@ export function KycStepperForm() {
   const [selfiePreviewUrl, setSelfiePreviewUrl] = React.useState<string | null>(null);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
+  const [accountHolderName, setAccountHolderName] = React.useState("");
+  const [accountNumber, setAccountNumber] = React.useState("");
+  const [ifsc, setIfsc] = React.useState("");
+  const [bankName, setBankName] = React.useState("");
+  const [upiId, setUpiId] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -755,6 +760,14 @@ export function KycStepperForm() {
       .then((data) => {
         if (cancelled) return;
         setKyc(data);
+        // Pre-fill bank details when resubmitting after a rejection.
+        if (data.bankDetails) {
+          setAccountHolderName(data.bankDetails.accountHolderName ?? "");
+          setAccountNumber(data.bankDetails.accountNumber ?? "");
+          setIfsc(data.bankDetails.ifsc ?? "");
+          setBankName(data.bankDetails.bankName ?? "");
+          setUpiId(data.bankDetails.upiId ?? "");
+        }
         setNotice(data.status === "pending" ? "Submitted for review. We'll notify you once it's verified." : null);
       })
       .catch(() => {
@@ -776,14 +789,21 @@ export function KycStepperForm() {
     }
     setCameraStatus("requesting");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+      });
       streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
       setCameraStatus("ready");
     } catch {
       setCameraStatus("unsupported");
     }
   };
+
+  React.useEffect(() => {
+    if (cameraStatus === "ready" && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [cameraStatus, selfiePreviewUrl]);
 
   React.useEffect(() => {
     return () => {
@@ -841,6 +861,10 @@ export function KycStepperForm() {
       setError("Capture a live selfie to complete KYC");
       return;
     }
+    if (!accountHolderName.trim() || !accountNumber.trim() || !ifsc.trim() || !bankName.trim()) {
+      setError("Bank details are required for payment setup: account holder name, account number, IFSC and bank name");
+      return;
+    }
     setError(null);
     setNotice(null);
     setLoading(true);
@@ -849,6 +873,11 @@ export function KycStepperForm() {
       form.append("file", zipFile);
       form.append("password", zipPassword.trim());
       form.append("selfie", selfieFile);
+      form.append("accountHolderName", accountHolderName.trim());
+      form.append("accountNumber", accountNumber.trim());
+      form.append("ifsc", ifsc.trim());
+      form.append("bankName", bankName.trim());
+      if (upiId.trim()) form.append("upiId", upiId.trim());
       const data = await api.post<Kyc>("/api/kyc/submit", form, { headers: {} });
       setKyc(data);
       setNotice("Submitted for review. We'll notify you once it's verified.");
@@ -893,8 +922,9 @@ export function KycStepperForm() {
           <p className="text-sm leading-6 text-muted-foreground">
             Download your E-Aadhaar as a <strong>password-protected ZIP</strong> from the official
             e-Aadhaar website (uidai.gov.in), then upload it here along with its password and a{" "}
-            <strong>live selfie</strong> taken right now. Our team will review it and approve your
-            KYC, after which you can list items.
+            <strong>live selfie</strong> taken right now. Add your <strong>bank details for payment
+            setup</strong> so payouts can be sent to you. Our team will review it and approve your
+            KYC, after which you can list and book items.
           </p>
         </div>
         <div>
@@ -976,6 +1006,52 @@ export function KycStepperForm() {
               </Button>
             )}
           </div>
+        </div>
+        <div className="md:col-span-2 flex items-start gap-3 rounded-lg bg-muted/50 p-4">
+          <ShieldCheck size={18} className="mt-0.5 shrink-0 text-primary" />
+          <p className="text-sm leading-6 text-muted-foreground">
+            Payment setup: your bank details are used to receive your rental
+            earnings (payouts) once your KYC is approved. Approved payouts
+            are sent to this account through the Razorpay gateway.
+          </p>
+        </div>
+        <Input
+          label="Account holder name"
+          value={accountHolderName}
+          onChange={(e) => setAccountHolderName(e.target.value)}
+          placeholder="Name as printed on the bank account"
+          required
+        />
+        <Input
+          label="Bank name"
+          value={bankName}
+          onChange={(e) => setBankName(e.target.value)}
+          placeholder="e.g. HDFC Bank"
+          required
+        />
+        <Input
+          label="Account number"
+          type="text"
+          inputMode="numeric"
+          value={accountNumber}
+          onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))}
+          placeholder="Bank account number"
+          required
+        />
+        <Input
+          label="IFSC code"
+          value={ifsc}
+          onChange={(e) => setIfsc(e.target.value.toUpperCase())}
+          placeholder="e.g. HDFC0001234"
+          required
+        />
+        <div className="md:col-span-2">
+          <Input
+            label="UPI ID (optional)"
+            value={upiId}
+            onChange={(e) => setUpiId(e.target.value)}
+            placeholder="yourname@upi"
+          />
         </div>
       </div>
       <FieldError message={error} />

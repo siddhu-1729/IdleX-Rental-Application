@@ -325,6 +325,26 @@ const reviewKyc = asyncHandler(async (req, res) => {
   kyc.rejectionReason = status === 'rejected' ? rejectionReason || 'Not approved' : null;
   await kyc.save();
 
+  // An approved KYC activates payment setup: the bank details collected
+  // during verification become the owner's payout settings, ready for
+  // Razorpay payouts once real keys are configured.
+  if (status === 'approved' && kyc.bankDetails) {
+    const { PayoutSettings } = require('../../models/Payout');
+    await PayoutSettings.findOneAndUpdate(
+      { owner: kyc.user },
+      {
+        $set: {
+          accountHolderName: kyc.bankDetails.accountHolderName,
+          accountNumber: kyc.bankDetails.accountNumber,
+          ifscOrRoutingNumber: kyc.bankDetails.ifsc,
+          bankName: kyc.bankDetails.bankName,
+          upiId: kyc.bankDetails.upiId,
+        },
+      },
+      { upsert: true, new: true }
+    );
+  }
+
   logAudit({
     actor: req.user._id,
     action: 'admin.kyc_reviewed',

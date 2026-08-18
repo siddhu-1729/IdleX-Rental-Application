@@ -26,6 +26,17 @@ const kycSchema = new mongoose.Schema(
       uploadedAt: Date,
     },
 
+    // Payment setup details collected alongside identity verification.
+    // On approval these populate the user's PayoutSettings so owners can
+    // receive their rental earnings.
+    bankDetails: {
+      accountHolderName: String,
+      accountNumber: String,
+      ifsc: String,
+      bankName: String,
+      upiId: String,
+    },
+
     rejectionReason: { type: String, default: null },
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     reviewedAt: { type: Date, default: null },

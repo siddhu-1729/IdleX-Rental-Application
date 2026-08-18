@@ -34,6 +34,24 @@ const submitKyc = asyncHandler(async (req, res) => {
     fileUrl: `/uploads/${files.selfie[0].filename}`,
     uploadedAt: new Date(),
   };
+
+  // Bank details are part of payment setup: on KYC approval they become
+  // the user's PayoutSettings so owners can receive rental earnings.
+  const { accountHolderName, accountNumber, ifsc, bankName, upiId } = req.body;
+  if (!String(accountHolderName || '').trim() || !String(accountNumber || '').trim() ||
+      !String(ifsc || '').trim() || !String(bankName || '').trim()) {
+    throw ApiError.badRequest(
+      'Bank details are required for payment setup: account holder name, account number, IFSC code and bank name'
+    );
+  }
+  kyc.bankDetails = {
+    accountHolderName: String(accountHolderName).trim(),
+    accountNumber: String(accountNumber).trim(),
+    ifsc: String(ifsc).trim().toUpperCase(),
+    bankName: String(bankName).trim(),
+    upiId: upiId ? String(upiId).trim() : undefined,
+  };
+
   kyc.status = 'pending';
   kyc.rejectionReason = null;
   kyc.reviewedBy = null;

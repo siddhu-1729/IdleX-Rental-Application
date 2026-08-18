@@ -123,8 +123,11 @@ export type PaymentStatus = "created" | "authorized" | "captured" | "failed" | "
 
 export type Payment = {
   _id: string;
-  booking: string;
+  booking: string | null;
   payer: string | Pick<User, "_id" | "name" | "email" | "avatarUrl">;
+  listing?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
   gateway: string;
   gatewayOrderId: string;
   gatewayPaymentId: string | null;
@@ -132,6 +135,19 @@ export type Payment = {
   currency: string;
   status: PaymentStatus;
   createdAt: string;
+};
+
+// Response of POST /api/payments/checkout — the client uses this to open
+// the Razorpay Checkout popup. `configured: false` means no Razorpay keys
+// are set (dev mode): the UI simulates the payment via /verify.
+export type RazorpayCheckoutOrder = {
+  paymentId: string;
+  orderId: string;
+  amount: number;
+  currency: string;
+  gateway: string;
+  keyId: string | null;
+  configured: boolean;
 };
 
 export type Payout = {
@@ -151,9 +167,18 @@ export type PayoutSettings = {
   accountNumber?: string;
   ifscOrRoutingNumber?: string;
   bankName?: string;
+  upiId?: string;
 };
 
 export type KycStatus = "not_started" | "in_progress" | "pending" | "approved" | "rejected";
+
+export type BankDetails = {
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  bankName?: string;
+  upiId?: string;
+};
 
 export type Kyc = {
   _id: string;
@@ -161,6 +186,7 @@ export type Kyc = {
   status: KycStatus;
   eAadhaar?: { fileUrl?: string; password?: string; uploadedAt?: string };
   selfie?: { fileUrl?: string; uploadedAt?: string };
+  bankDetails?: BankDetails;
   rejectionReason?: string | null;
   reviewedBy?: string | null;
   reviewedAt?: string | null;
@@ -294,6 +320,7 @@ export type AppNotificationType =
   | "extension_requested"
   | "return_requested"
   | "return_confirmed"
+  | "payment_captured"
   | "info";
 
 export type AppNotification = {

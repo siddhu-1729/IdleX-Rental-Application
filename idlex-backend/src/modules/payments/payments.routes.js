@@ -1,10 +1,12 @@
 const express = require('express');
 const controller = require('./payments.controller');
 const { protect } = require('../../middlewares/auth.middleware');
+const { requireApprovedKyc } = require('../../middlewares/kyc.middleware');
 
 const router = express.Router();
 
-router.post('/checkout', protect, controller.checkout);
+router.post('/checkout', protect, requireApprovedKyc, controller.checkout);
+router.post('/verify', protect, controller.verify);
 router.get('/payouts', protect, controller.listPayoutHistory);
 router.get('/payout-settings', protect, controller.getPayoutSettings);
 router.put('/payout-settings', protect, controller.updatePayoutSettings);
