@@ -1,13 +1,13 @@
 const crypto = require('crypto');
-const env = require('../config/env');
 const User = require('../models/User');
 const PhoneOtp = require('../models/PhoneOtp');
 const { sendOtpEmail } = require('./email');
+const { sendOtpSms } = require('./sms');
 
 // OTP generation/delivery is treated as an external concern, same as the
 // Django doc calls out (Django/Express have no built-in SMS/email sending).
-// Swap sendOtpSms's internals for Twilio, MSG91, etc. — the rest of the
-// auth flow doesn't need to know which provider is behind it.
+// SMS OTPs go out via the Renflair gateway (see utils/sms.js) — the rest of
+// the auth flow doesn't need to know which provider is behind it.
 
 const EMAIL_OTP_TTL_MS = 10 * 60 * 1000;
 const PHONE_OTP_TTL_MS = 10 * 60 * 1000;
@@ -31,38 +31,6 @@ function normalizePhone(phone) {
   if (digits.startsWith('91') && digits.length === 12) digits = digits.slice(2);
   if (digits.length !== 10) return null;
   return `+91${digits}`;
-}
-
-// Sends an SMS OTP via Twilio. Never throws — on any provider problem the
-// code is logged to the console so the flow still works in development.
-async function sendOtpSms(phone, otp) {
-  if (!env.twilio.accountSid || !env.twilio.authToken) {
-    console.log(`[otp] (dev) OTP for ${phone}: ${otp}`);
-    return;
-  }
-  if (env.twilio.accountSid.startsWith('SK')) {
-    console.error(
-      `[otp] TWILIO_ACCOUNT_SID starts with "SK" (API Key SID). Twilio needs the Account SID (starts with "AC") from twilio.com/console. Logging OTP instead.`
-    );
-    console.log(`[otp] (dev) OTP for ${phone}: ${otp}`);
-    return;
-  }
-  if (!env.twilio.fromNumber) {
-    console.error('[otp] TWILIO_FROM_NUMBER is empty. Logging OTP instead.');
-    console.log(`[otp] (dev) OTP for ${phone}: ${otp}`);
-    return;
-  }
-  try {
-    const twilio = require('twilio')(env.twilio.accountSid, env.twilio.authToken);
-    await twilio.messages.create({
-      body: `Your IdleX verification code is ${otp}`,
-      from: env.twilio.fromNumber,
-      to: phone,
-    });
-  } catch (err) {
-    console.error(`[otp] Twilio send failed (${err.message}). Logging OTP instead.`);
-    console.log(`[otp] (dev) OTP for ${phone}: ${otp}`);
-  }
 }
 
 // Stores a phone OTP (one per number+purpose) and sends it. Returns the
@@ -128,7 +96,7 @@ async function verifyEmailOtpRecord(userId, code, purpose) {
 module.exports = {
   generateOtp,
   normalizePhone,
-  sendOtpSms,
+  sendOtpSms, // re-exported from utils/sms.js (Renflair gateway)
   issuePhoneOtp,
   verifyPhoneOtpRecord,
   issueEmailOtp,

@@ -19,10 +19,10 @@ const env = {
     refreshExpires: process.env.JWT_REFRESH_EXPIRES || '7d',
   },
 
-  twilio: {
-    accountSid: process.env.TWILIO_ACCOUNT_SID,
-    authToken: process.env.TWILIO_AUTH_TOKEN,
-    fromNumber: process.env.TWILIO_FROM_NUMBER,
+  renflair: {
+    // API key for the Renflair SMS/OTP gateway (sms.renflair.in). When unset
+    // (local dev) the SMS util logs OTPs to the console so flows still work.
+    apiKey: process.env.RENFLAIR_API_KEY,
   },
 
   smtp: {

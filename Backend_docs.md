@@ -79,8 +79,9 @@ state.
   short-lived and sent via `Authorization: Bearer`, refresh token used
   only to mint new access tokens.
 - OTP: generated and stored (hashed-in-practice recommended) on the user
-  document with an expiry; delivery is via Twilio, same "SMS is an
-  external integration, not a framework feature" note as the Django doc.
+  document with an expiry; delivery is via Renflair SMS gateway, same
+  "SMS is an external integration, not a framework feature" note as the
+  Django doc.
 
 | Endpoint | Method | Notes |
 |---|---|---|
