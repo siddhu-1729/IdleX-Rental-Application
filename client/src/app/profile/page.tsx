@@ -24,6 +24,68 @@ function ProfileInner() {
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
 
+  const phoneChanged = phone.trim() !== (user?.phone ?? "").trim() && phone.trim().length >= 10;
+  const [otpSent, setOtpSent] = React.useState(false);
+  const [otpCode, setOtpCode] = React.useState("");
+  const [otpSending, setOtpSending] = React.useState(false);
+  const [otpVerifying, setOtpVerifying] = React.useState(false);
+  const [phoneVerified, setPhoneVerified] = React.useState(false);
+  const [phoneVerificationToken, setPhoneVerificationToken] = React.useState<string | null>(null);
+  const [otpMessage, setOtpMessage] = React.useState<string | null>(null);
+
+  const resetPhoneOtp = () => {
+    setOtpSent(false);
+    setOtpCode("");
+    setPhoneVerified(false);
+    setPhoneVerificationToken(null);
+    setOtpMessage(null);
+  };
+
+  const sendOtp = async () => {
+    setError(null);
+    setOtpMessage(null);
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length !== 10) {
+      setError("Enter a valid 10-digit phone number");
+      return;
+    }
+    setOtpSending(true);
+    try {
+      await api.post<null>("/api/auth/phone-otp/request", { phone: digits, purpose: "profile" });
+      setOtpSent(true);
+      setOtpMessage("Verification code sent to the new number.");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    setError(null);
+    setOtpMessage(null);
+    if (otpCode.trim().length !== 6) {
+      setError("Enter the 6-digit code");
+      return;
+    }
+    setOtpVerifying(true);
+    try {
+      const digits = phone.replace(/\D/g, "");
+      const res = await api.post<{ verified: boolean; token: string }>("/api/auth/phone-otp/verify", {
+        phone: digits,
+        code: otpCode.trim(),
+        purpose: "profile",
+      });
+      setPhoneVerified(true);
+      setPhoneVerificationToken(res.token);
+      setOtpMessage("New phone number verified.");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+
   React.useEffect(() => {
     let cancelled = false;
     api
@@ -40,10 +102,19 @@ function ProfileInner() {
   const save = async () => {
     setError(null);
     setMessage(null);
+    if (phoneChanged && !phoneVerified) {
+      setError("Verify the new phone number with an OTP before saving");
+      return;
+    }
     setLoading(true);
     try {
-      const updated = await api.patch<User>("/api/auth/me", { name, phone: phone || undefined });
+      const updated = await api.patch<User>("/api/auth/me", {
+        name,
+        phone: phone || undefined,
+        phoneVerificationToken: phoneChanged ? phoneVerificationToken ?? undefined : undefined,
+      });
       setMessage("Profile saved.");
+      resetPhoneOtp();
       await refreshUser().catch(() => updated);
     } catch (err) {
       setError(errorMessage(err));
@@ -78,8 +149,38 @@ function ProfileInner() {
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <Input label="Full name" value={name} onChange={(e) => setName(e.target.value)} />
           <Input label="Email" value={email} readOnly />
-          <Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Input label="Phone" value={phone} onChange={(e) => { setPhone(e.target.value); resetPhoneOtp(); }} />
         </div>
+        {phoneChanged && !phoneVerified && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/50 p-4">
+            <p className="text-sm text-muted-foreground">
+              You changed your phone number — verify it with an OTP to save.
+            </p>
+            <div className="flex flex-1 flex-wrap items-center gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={sendOtp} loading={otpSending}>
+                {otpSent ? "Resend OTP" : "Send OTP"}
+              </Button>
+              {otpSent && (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                    placeholder="6-digit code"
+                    className="h-9 w-32"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={verifyOtp} loading={otpVerifying}>
+                    Verify
+                  </Button>
+                </div>
+              )}
+              {otpMessage && <p className="text-sm text-muted-foreground">{otpMessage}</p>}
+            </div>
+          </div>
+        )}
+        {phoneVerified && <p className="mt-4 text-sm font-medium text-success">New phone number verified.</p>}
         {error && <p className="mt-4 rounded-md bg-danger-50 p-3 text-sm text-danger">{error}</p>}
         {message && <p className="mt-4 rounded-md bg-secondary-50 p-3 text-sm text-secondary-700">{message}</p>}
         <div className="mt-5 flex gap-3">

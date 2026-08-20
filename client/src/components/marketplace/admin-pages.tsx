@@ -798,7 +798,7 @@ export function AdminKycPage() {
         <div>
           <h1 className="text-2xl font-bold">KYC Verification</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Users upload a password-protected E-Aadhaar ZIP plus a live selfie. Download the ZIP, unlock it with the provided password, compare the selfie with the Aadhaar photo, then approve or reject.
+            Users upload an identity document (PDF) plus a live selfie. Download the PDF, compare the selfie with the document photo, then approve or reject.
           </p>
         </div>
       </div>
@@ -810,8 +810,7 @@ export function AdminKycPage() {
             <tr>
               <Th>User</Th>
               <Th>Live Selfie</Th>
-              <Th>E-Aadhaar ZIP</Th>
-              <Th>ZIP Password</Th>
+              <Th>Document</Th>
               <Th>Bank Details</Th>
               <Th>Status</Th>
               <Th>Submitted</Th>
@@ -833,15 +832,14 @@ export function AdminKycPage() {
                   )}
                 </Td>
                 <Td>
-                  {kyc.eAadhaar?.fileUrl ? (
-                    <a href={kyc.eAadhaar.fileUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">
-                      Download ZIP
+                  {kyc.document?.fileUrl ? (
+                    <a href={kyc.document.fileUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">
+                      Download PDF
                     </a>
                   ) : (
                     "—"
                   )}
                 </Td>
-                <Td>{kyc.eAadhaar?.password ? <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{kyc.eAadhaar.password}</code> : "—"}</Td>
                 <Td>
                   {kyc.bankDetails?.accountNumber ? (
                     <div className="text-xs">

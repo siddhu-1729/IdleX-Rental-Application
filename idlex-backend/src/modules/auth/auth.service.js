@@ -1,18 +1,41 @@
 const crypto = require('crypto');
 const User = require('../../models/User');
 const ApiError = require('../../utils/ApiError');
-const { signAccessToken, signRefreshToken } = require('../../utils/tokens');
-const { generateOtp, sendOtpSms, issueEmailOtp, verifyEmailOtpRecord } = require('../../utils/otp');
+const { signAccessToken, signRefreshToken, signPhoneVerificationToken, verifyPhoneVerificationToken } = require('../../utils/tokens');
+const { generateOtp, sendOtpSms, normalizePhone, issuePhoneOtp, verifyPhoneOtpRecord, issueEmailOtp, verifyEmailOtpRecord } = require('../../utils/otp');
 
 // Business logic lives here, controllers stay thin (parse req -> call
 // service -> shape response) — mirrors keeping Django views thin and
 // pushing logic into a services.py module.
 
-async function register({ name, email, phone, password }) {
+async function register({ name, email, phone, password, phoneVerificationToken }) {
   const existing = await User.findOne({ email });
   if (existing) throw ApiError.conflict('Email already registered');
 
-  const user = await User.create({ name, email, phone, password });
+  let normalizedPhone;
+  if (phone) {
+    normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) throw ApiError.badRequest('Enter a valid 10-digit phone number');
+    const phoneInUse = await User.findOne({ phone: normalizedPhone });
+    if (phoneInUse) throw ApiError.conflict('Phone number already registered');
+    if (!phoneVerificationToken) {
+      throw ApiError.badRequest('Verify your phone number with an OTP before creating the account');
+    }
+    try {
+      const payload = verifyPhoneVerificationToken(phoneVerificationToken);
+      if (payload.phone !== normalizedPhone || payload.purpose !== 'signup') {
+        throw new Error('mismatch');
+      }
+    } catch (err) {
+      throw ApiError.badRequest('Phone verification is invalid or expired. Request a new OTP');
+    }
+  }
+
+  const user = await User.create({ name, email, phone: normalizedPhone, password });
+  if (normalizedPhone) {
+    user.isPhoneVerified = true;
+    await user.save();
+  }
   return issueTokens(user);
 }
 
@@ -31,6 +54,26 @@ function issueTokens(user) {
     accessToken: signAccessToken(user),
     refreshToken: signRefreshToken(user),
   };
+}
+
+// Issues a phone OTP for signup or profile phone-change verification.
+// The number does not need an account yet — OTPs are stored separately.
+async function requestPhoneOtp(phone, purpose) {
+  const result = await issuePhoneOtp(phone, purpose);
+  if (!result) throw ApiError.badRequest('Enter a valid 10-digit phone number');
+  return result;
+}
+
+// Validates a phone OTP and returns a short-lived verification token the
+// caller must present when registering or saving a new profile number.
+async function verifyPhoneOtp(phone, code, purpose) {
+  const result = await verifyPhoneOtpRecord(phone, code, purpose);
+  if (!result.ok) {
+    if (result.reason === 'not_found') throw ApiError.badRequest('No OTP requested for this number');
+    if (result.reason === 'attempts') throw ApiError.badRequest('Too many incorrect attempts. Request a new OTP');
+    throw ApiError.badRequest('OTP is invalid or expired');
+  }
+  return { verified: true, token: signPhoneVerificationToken(result.phone, purpose) };
 }
 
 async function requestOtp(phone) {
@@ -113,13 +156,34 @@ async function confirmPasswordReset(token, newPassword) {
 // Profile updates + renter->owner upgrade. `becomeOwner` is the only
 // path that sets the owner role — registration never accepts it, so
 // there is no privilege-escalation surface via register.
-async function updateMe(userId, { name, phone, avatarUrl, becomeOwner }) {
+async function updateMe(userId, { name, phone, phoneVerificationToken, avatarUrl, becomeOwner }) {
   const user = await User.findById(userId);
   if (!user) throw ApiError.notFound('User not found');
 
   if (name !== undefined) user.name = name;
-  if (phone !== undefined) user.phone = phone;
   if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+
+  // Changing the phone number requires OTP verification of the NEW
+  // number first — `phoneVerificationToken` proves it was verified.
+  if (phone !== undefined && phone !== user.phone) {
+    const normalized = normalizePhone(phone);
+    if (!normalized) throw ApiError.badRequest('Enter a valid 10-digit phone number');
+    const inUse = await User.findOne({ phone: normalized, _id: { $ne: userId } });
+    if (inUse) throw ApiError.conflict('Phone number already in use by another account');
+    if (!phoneVerificationToken) {
+      throw ApiError.badRequest('Verify the new phone number with an OTP before saving');
+    }
+    try {
+      const payload = verifyPhoneVerificationToken(phoneVerificationToken);
+      if (payload.phone !== normalized || payload.purpose !== 'profile') {
+        throw new Error('mismatch');
+      }
+    } catch (err) {
+      throw ApiError.badRequest('Phone verification is invalid or expired. Request a new OTP');
+    }
+    user.phone = normalized;
+    user.isPhoneVerified = true;
+  }
 
   if (becomeOwner) {
     user.role = 'owner';
@@ -135,6 +199,8 @@ module.exports = {
   login,
   requestOtp,
   verifyOtp,
+  requestPhoneOtp,
+  verifyPhoneOtp,
   requestEmailOtp,
   verifyEmailOtp,
   requestPasswordReset,

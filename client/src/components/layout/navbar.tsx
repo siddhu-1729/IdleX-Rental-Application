@@ -198,17 +198,7 @@ export function Navbar() {
         </div>
       )}
 
-      <style jsx global>{`
-        @keyframes menuIn {
-          from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        @keyframes fadeInDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-    </header>
+      </header>
   );
 }
 

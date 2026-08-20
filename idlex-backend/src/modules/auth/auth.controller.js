@@ -77,6 +77,16 @@ const verifyOtp = asyncHandler(async (req, res) => {
   return new ApiResponse(200, user, 'Phone verified').send(res);
 });
 
+const requestPhoneOtp = asyncHandler(async (req, res) => {
+  const result = await authService.requestPhoneOtp(req.body.phone, req.body.purpose);
+  return new ApiResponse(200, result, 'OTP sent').send(res);
+});
+
+const verifyPhoneOtp = asyncHandler(async (req, res) => {
+  const result = await authService.verifyPhoneOtp(req.body.phone, req.body.code, req.body.purpose);
+  return new ApiResponse(200, result, 'Phone verified').send(res);
+});
+
 const requestEmailOtp = asyncHandler(async (req, res) => {
   await authService.requestEmailOtp(req.body.email);
   return new ApiResponse(200, null, 'If that email exists, a verification code has been sent').send(res);
@@ -112,6 +122,8 @@ module.exports = {
   refreshToken,
   requestOtp,
   verifyOtp,
+  requestPhoneOtp,
+  verifyPhoneOtp,
   requestEmailOtp,
   verifyEmailOtp,
   requestPasswordReset,

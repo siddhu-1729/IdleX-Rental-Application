@@ -18,6 +18,7 @@ export type RegisterPayload = {
   name: string;
   email: string;
   phone?: string;
+  phoneVerificationToken?: string;
   password: string;
   becomeOwner?: boolean;
 };
@@ -141,7 +142,8 @@ function mockRegister(payload: RegisterPayload): User {
     role: payload.becomeOwner ? "owner" : "renter",
     isOwner: !!payload.becomeOwner,
     isRenter: true,
-    isPhoneVerified: false,
+    // Mock mode can't send SMS OTPs, so a registered phone counts as verified.
+    isPhoneVerified: !!payload.phone,
     isEmailVerified: true,
     isActive: true,
     avatarUrl: null,
@@ -191,6 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: payload.name,
         email: payload.email,
         phone: payload.phone,
+        phoneVerificationToken: payload.phoneVerificationToken,
         password: payload.password,
       });
     } catch (err) {

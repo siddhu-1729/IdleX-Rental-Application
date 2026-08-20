@@ -19,7 +19,8 @@ import {
   Wallet,
 } from "@/components/ui/icons";
 import { ROUTES } from "@/lib/constants";
-import { useAuth, errorMessage } from "@/lib/auth";
+import { useAuth, errorMessage, isNetworkError } from "@/lib/auth";
+import { api } from "@/lib/api-client";
 
 const roles = [
   {
@@ -48,6 +49,78 @@ export default function RegisterPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
 
+  const [otpSent, setOtpSent] = React.useState(false);
+  const [otpCode, setOtpCode] = React.useState("");
+  const [otpSending, setOtpSending] = React.useState(false);
+  const [otpVerifying, setOtpVerifying] = React.useState(false);
+  const [phoneVerified, setPhoneVerified] = React.useState(false);
+  const [phoneVerificationToken, setPhoneVerificationToken] = React.useState<string | null>(null);
+  const [otpMessage, setOtpMessage] = React.useState<string | null>(null);
+
+  const resetOtp = () => {
+    setOtpSent(false);
+    setOtpCode("");
+    setPhoneVerified(false);
+    setPhoneVerificationToken(null);
+    setOtpMessage(null);
+  };
+
+  const sendOtp = async () => {
+    setError(null);
+    setOtpMessage(null);
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length !== 10) {
+      setError("Enter a valid 10-digit phone number");
+      return;
+    }
+    setOtpSending(true);
+    try {
+      await api.post<null>("/api/auth/phone-otp/request", { phone: digits, purpose: "signup" });
+      setOtpSent(true);
+      setOtpMessage("Verification code sent to your phone.");
+    } catch (err) {
+      if (isNetworkError(err)) {
+        // Backend unreachable — offline demo mode: treat the phone as verified.
+        setPhoneVerified(true);
+        setOtpMessage("Offline demo mode — phone marked as verified.");
+      } else {
+        setError(errorMessage(err));
+      }
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    setError(null);
+    setOtpMessage(null);
+    if (otpCode.trim().length !== 6) {
+      setError("Enter the 6-digit code");
+      return;
+    }
+    setOtpVerifying(true);
+    try {
+      const digits = phone.replace(/\D/g, "");
+      const res = await api.post<{ verified: boolean; token: string }>("/api/auth/phone-otp/verify", {
+        phone: digits,
+        code: otpCode.trim(),
+        purpose: "signup",
+      });
+      setPhoneVerified(true);
+      setPhoneVerificationToken(res.token);
+      setOtpMessage("Phone verified.");
+    } catch (err) {
+      if (isNetworkError(err)) {
+        setPhoneVerified(true);
+        setOtpMessage("Offline demo mode — phone marked as verified.");
+      } else {
+        setError(errorMessage(err));
+      }
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -57,6 +130,10 @@ export default function RegisterPage() {
     }
     if (phone.trim().length < 7) {
       setError("Phone number must be at least 7 digits");
+      return;
+    }
+    if (!phoneVerified) {
+      setError("Verify your phone number with the OTP before creating the account");
       return;
     }
     if (password.length < 8) {
@@ -69,7 +146,14 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      const user = await register({ name, email, phone, password, becomeOwner: role === "owner" });
+      const user = await register({
+        name,
+        email,
+        phone: phone.replace(/\D/g, ""),
+        phoneVerificationToken: phoneVerificationToken ?? undefined,
+        password,
+        becomeOwner: role === "owner",
+      });
       if (user.role === "admin") {
         router.push(ROUTES.ADMIN);
       } else if (!user.isEmailVerified) {
@@ -200,7 +284,56 @@ export default function RegisterPage() {
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <Input label="Full name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Venkata Siddhardha" minLength={2} required />
-                <Input label="Phone number" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" minLength={7} required />
+                <div>
+                  <Input
+                    label="Phone number"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      resetOtp();
+                    }}
+                    placeholder="98765 43210"
+                    minLength={10}
+                    required
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      type="button"
+                      variant={phoneVerified ? "outline" : "secondary"}
+                      size="sm"
+                      onClick={sendOtp}
+                      loading={otpSending}
+                      disabled={phoneVerified}
+                      className="transition-transform hover:-translate-y-0.5"
+                    >
+                      {phoneVerified ? "Verified" : otpSent ? "Resend OTP" : "Send OTP"}
+                    </Button>
+                    {otpSent && !phoneVerified && (
+                      <div className="flex flex-1 gap-2">
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          value={otpCode}
+                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                          placeholder="6-digit code"
+                          className="h-9"
+                        />
+                        <Button type="button" variant="outline" size="sm" onClick={verifyOtp} loading={otpVerifying}>
+                          Verify
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  {phoneVerified && (
+                    <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-success">
+                      <CheckCircle size={15} />
+                      Phone verified
+                    </p>
+                  )}
+                  {otpMessage && !phoneVerified && <p className="mt-2 text-sm text-muted-foreground">{otpMessage}</p>}
+                </div>
                 <Input label="Email address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="siddhu@example.com" required />
                 <Select
                   label="City"

@@ -184,7 +184,7 @@ export type Kyc = {
   _id: string;
   user: string | Pick<User, "_id" | "name" | "email" | "phone">;
   status: KycStatus;
-  eAadhaar?: { fileUrl?: string; password?: string; uploadedAt?: string };
+  document?: { fileUrl?: string; uploadedAt?: string };
   selfie?: { fileUrl?: string; uploadedAt?: string };
   bankDetails?: BankDetails;
   rejectionReason?: string | null;

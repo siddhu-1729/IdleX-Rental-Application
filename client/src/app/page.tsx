@@ -258,26 +258,6 @@ export default function Home() {
         </div>
       </section>
 
-      <style jsx global>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(16px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0) translateX(0);
-          }
-          50% {
-            transform: translateY(-18px) translateX(10px);
-          }
-        }
-      `}</style>
-    </PublicShell>
+      </PublicShell>
   );
 }

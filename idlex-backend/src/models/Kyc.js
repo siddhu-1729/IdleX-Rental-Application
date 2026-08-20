@@ -1,9 +1,8 @@
 const mongoose = require('mongoose');
 
 // One row per user, updated in place each time the user submits KYC.
-// The only accepted proof of identity is the password-protected E-Aadhaar
-// ZIP downloaded from the UIDAI e-Aadhaar portal. The password the user
-// provides unlocks the ZIP for the admin reviewer.
+// Proof of identity is an uploaded document (PDF) plus a live selfie
+// captured at submission time. Both go to the admin for review.
 const kycSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
@@ -14,13 +13,12 @@ const kycSchema = new mongoose.Schema(
       default: 'not_started',
     },
 
-    eAadhaar: {
+    document: {
       fileUrl: String,
-      password: String,
       uploadedAt: Date,
     },
     // Live selfie captured at submission time — the admin compares it with
-    // the photo inside the E-Aadhaar ZIP before approving.
+    // the photo inside the uploaded document before approving.
     selfie: {
       fileUrl: String,
       uploadedAt: Date,
@@ -28,7 +26,7 @@ const kycSchema = new mongoose.Schema(
 
     // Payment setup details collected alongside identity verification.
     // On approval these populate the user's PayoutSettings so owners can
-    // receive their rental earnings.
+    // receive their rental earnings via Razorpay payouts.
     bankDetails: {
       accountHolderName: String,
       accountNumber: String,

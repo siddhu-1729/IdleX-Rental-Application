@@ -11,9 +11,124 @@ const bookingsService = require('../bookings/bookings.service');
 // pay → verify → booking flow can be tested before real keys exist.
 const DEV_SIGNATURE = 'dev-signature';
 
+const RAZORPAY_API_BASE = 'https://api.razorpay.com';
+
 function getRazorpayClient() {
   if (!env.razorpay.keyId || !env.razorpay.keySecret) return null;
   return new Razorpay({ key_id: env.razorpay.keyId, key_secret: env.razorpay.keySecret });
+}
+
+// Raw REST call to the Razorpay API (Payouts endpoints are not exposed by
+// the installed SDK). Basic auth with the key pair; works from localhost
+// and serverless hosts (Vercel) alike — no IP whitelisting needed.
+async function razorpayRequest(method, path, data) {
+  const auth = Buffer.from(`${env.razorpay.keyId}:${env.razorpay.keySecret}`).toString('base64');
+  const res = await fetch(`${RAZORPAY_API_BASE}${path}`, {
+    method,
+    headers: {
+      Authorization: `Basic ${auth}`,
+      'Content-Type': 'application/json',
+    },
+    body: data ? JSON.stringify(data) : undefined,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(json.error?.description || `Razorpay API error (${res.status})`);
+    err.status = res.status;
+    err.details = json.error || json;
+    throw err;
+  }
+  return json;
+}
+
+// Idempotent contact + fund-account resolution for a payout beneficiary.
+// Reuses an existing contact by email and an existing fund account by
+// bank identifiers so repeated payouts to the same owner don't duplicate.
+async function findOrCreatePayoutContact(user) {
+  const list = await razorpayRequest('GET', `/v1/contacts?email=${encodeURIComponent(user.email)}`);
+  const existing = (list.items || []).find((c) => c.email === user.email);
+  if (existing) return existing;
+  return razorpayRequest('POST', '/v1/contacts', {
+    name: user.name || 'IdleX user',
+    email: user.email,
+    contact: user.phone || undefined,
+    type: 'customer',
+  });
+}
+
+async function findOrCreateFundAccount(contactId, settings) {
+  const list = await razorpayRequest('GET', `/v1/fund_accounts?contact_id=${contactId}`);
+  const existing = (list.items || []).find(
+    (fa) =>
+      fa.bank_account?.ifsc === settings.ifscOrRoutingNumber &&
+      fa.bank_account?.account_number === settings.accountNumber
+  );
+  if (existing) return existing;
+  return razorpayRequest('POST', '/v1/fund_accounts', {
+    contact_id: contactId,
+    account_type: 'bank_account',
+    bank_account: {
+      name: settings.accountHolderName,
+      ifsc: settings.ifscOrRoutingNumber,
+      account_number: settings.accountNumber,
+    },
+  });
+}
+
+// Owner payout for a captured payment. The owner receives the rental
+// subtotal; the platform keeps the service fee and the deposit stays
+// refundable to the renter. If Razorpay keys or the settlement account or
+// the owner's payout settings are missing, the payout is recorded as
+// 'pending' and the API is skipped (dev/test mode) — the booking flow
+// itself never fails because of a payout problem.
+async function settleOwnerPayout(payment, booking) {
+  const listing = await require('../../models/Listing').findById(payment.listing).select('owner title');
+  if (!listing) return null;
+  const settings = await PayoutSettings.findOne({ owner: listing.owner });
+  if (!settings) return null;
+
+  const payout = await Payout.create({
+    owner: listing.owner,
+    booking: booking._id,
+    amount: booking.subtotal,
+    status: 'pending',
+  });
+
+  const client = getRazorpayClient();
+  if (!client || !env.razorpay.payoutAccountNumber) return payout;
+
+  try {
+    const User = require('../../models/User');
+    const owner = await User.findById(listing.owner).select('name email phone');
+    if (!owner) return payout;
+
+    const contact = await findOrCreatePayoutContact(owner);
+    const fundAccount = await findOrCreateFundAccount(contact.id, settings);
+    const referenceId = `idlex_${booking._id}`;
+
+    const result = await razorpayRequest('POST', '/v1/payouts', {
+      account_number: env.razorpay.payoutAccountNumber,
+      fund_account_id: fundAccount.id,
+      amount: Math.round(booking.subtotal * 100), // paise
+      currency: 'INR',
+      mode: 'IMPS',
+      purpose: 'payout',
+      reference_id: referenceId,
+      narration: `Rental payout for booking ${booking._id}`,
+      queue_if_low_balance: true,
+    });
+
+    payout.gatewayPayoutId = result.id;
+    payout.status = 'paid';
+    await payout.save();
+    return payout;
+  } catch (err) {
+    console.error(`[payout] failed for booking ${booking._id}:`, err.message);
+    payout.status = 'failed';
+    payout.gatewayPayoutId = err.details?.metadata?.payout_id || null;
+    await payout.save();
+    return payout;
+  }
 }
 
 // Pay-first checkout: an order is created against the listing + dates and
@@ -112,6 +227,12 @@ async function markPaymentCaptured({ gatewayOrderId, gatewayPaymentId, signature
   payment.booking = booking._id;
   await payment.save();
 
+  // Owner payout for the rental subtotal. Never blocks or fails the
+  // capture — failures leave the payout as 'pending'/'failed' to retry.
+  await settleOwnerPayout(payment, booking).catch((err) => {
+    console.error(`[payout] skipped for booking ${booking._id}:`, err.message);
+  });
+
   await notifyAdminsOfCapture(payment, booking);
 
   return { payment, booking, created: true };
@@ -155,6 +276,7 @@ module.exports = {
   verifyPaymentSignature,
   verifyWebhookSignature,
   markPaymentCaptured,
+  settleOwnerPayout,
   Payout,
   PayoutSettings,
 };

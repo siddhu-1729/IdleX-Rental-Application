@@ -7,6 +7,8 @@ const {
   loginSchema,
   otpRequestSchema,
   otpVerifySchema,
+  phoneOtpRequestSchema,
+  phoneOtpVerifySchema,
   emailOtpRequestSchema,
   emailOtpVerifySchema,
   passwordResetRequestSchema,
@@ -21,6 +23,8 @@ router.post('/login', validate(loginSchema), controller.login);
 router.post('/token/refresh', controller.refreshToken);
 router.post('/otp/request', validate(otpRequestSchema), controller.requestOtp);
 router.post('/otp/verify', validate(otpVerifySchema), controller.verifyOtp);
+router.post('/phone-otp/request', validate(phoneOtpRequestSchema), controller.requestPhoneOtp);
+router.post('/phone-otp/verify', validate(phoneOtpVerifySchema), controller.verifyPhoneOtp);
 router.post('/email-otp/request', validate(emailOtpRequestSchema), controller.requestEmailOtp);
 router.post('/email-otp/verify', validate(emailOtpVerifySchema), controller.verifyEmailOtp);
 router.post('/password/reset', validate(passwordResetRequestSchema), controller.requestPasswordReset);

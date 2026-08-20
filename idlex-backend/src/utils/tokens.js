@@ -26,9 +26,22 @@ function verifyRefreshToken(token) {
   return jwt.verify(token, env.jwt.refreshSecret);
 }
 
+// Short-lived proof that a phone number was OTP-verified. Bound to the
+// normalized number and the flow purpose so a code from one flow can't
+// be replayed in another.
+function signPhoneVerificationToken(phone, purpose) {
+  return jwt.sign({ phone, purpose }, env.jwt.accessSecret, { expiresIn: '10m' });
+}
+
+function verifyPhoneVerificationToken(token) {
+  return jwt.verify(token, env.jwt.accessSecret);
+}
+
 module.exports = {
   signAccessToken,
   signRefreshToken,
   verifyAccessToken,
   verifyRefreshToken,
+  signPhoneVerificationToken,
+  verifyPhoneVerificationToken,
 };

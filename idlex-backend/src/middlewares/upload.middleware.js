@@ -18,9 +18,8 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  // ZIP is accepted for the E-Aadhaar KYC upload; browsers send either
-  // application/zip or application/x-zip-compressed.
-  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'application/zip', 'application/x-zip-compressed'];
+  // Images for listing photos/selfies and PDF for the KYC document.
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
   if (allowed.includes(file.mimetype)) cb(null, true);
   else cb(new Error('Unsupported file type'), false);
 };
@@ -28,7 +27,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB — password-protected Aadhaar ZIPs can be larger
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB — plenty for a KYC PDF
 });
 
 module.exports = upload;

@@ -42,6 +42,10 @@ const env = {
     keyId: process.env.RAZORPAY_KEY_ID,
     keySecret: process.env.RAZORPAY_KEY_SECRET,
     webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+    // Settlement/merchant bank account number used as the source account
+    // for owner payouts (shown in Razorpay dashboard → Payouts). Unset in
+    // dev/test mode — payouts then stay in 'pending' without calling the API.
+    payoutAccountNumber: process.env.RAZORPAY_ACCOUNT_NUMBER,
   },
 
   admin: {

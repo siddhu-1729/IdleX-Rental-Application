@@ -5,6 +5,8 @@ const registerSchema = z.object({
   email: z.string().email(),
   phone: z.string().min(7).optional(),
   password: z.string().min(8),
+  // Required when a phone is provided — proves the number was OTP-verified.
+  phoneVerificationToken: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -19,6 +21,17 @@ const otpRequestSchema = z.object({
 const otpVerifySchema = z.object({
   phone: z.string().min(7),
   code: z.string().length(6),
+});
+
+const phoneOtpRequestSchema = z.object({
+  phone: z.string().min(7),
+  purpose: z.enum(['signup', 'profile']),
+});
+
+const phoneOtpVerifySchema = z.object({
+  phone: z.string().min(7),
+  code: z.string().length(6),
+  purpose: z.enum(['signup', 'profile']),
 });
 
 const emailOtpRequestSchema = z.object({
@@ -44,6 +57,8 @@ const passwordResetConfirmSchema = z.object({
 const updateMeSchema = z.object({
   name: z.string().min(2).optional(),
   phone: z.string().min(7).optional(),
+  // Required when `phone` differs from the user's current number.
+  phoneVerificationToken: z.string().optional(),
   avatarUrl: z.string().optional(),
   becomeOwner: z.boolean().optional(),
 });
@@ -53,6 +68,8 @@ module.exports = {
   loginSchema,
   otpRequestSchema,
   otpVerifySchema,
+  phoneOtpRequestSchema,
+  phoneOtpVerifySchema,
   emailOtpRequestSchema,
   emailOtpVerifySchema,
   passwordResetRequestSchema,

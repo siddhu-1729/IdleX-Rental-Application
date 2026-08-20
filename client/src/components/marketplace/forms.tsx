@@ -168,13 +168,7 @@ export function AuthPanel({ mode }: { mode: "login" | "sign-up" | "forgot" | "ot
           )}
         </div>
       </div>
-      <style jsx global>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-    </form>
+      </form>
   );
 }
 
@@ -725,20 +719,13 @@ export function ListingStepperForm({ edit = false, listingId }: { edit?: boolean
           </Button>
         </div>
       )}
-      <style jsx global>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-    </div>
+      </div>
   );
 }
 
 export function KycStepperForm() {
   const [kyc, setKyc] = React.useState<Kyc | null>(null);
-  const [zipFile, setZipFile] = React.useState<File | null>(null);
-  const [zipPassword, setZipPassword] = React.useState("");
+  const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [cameraStatus, setCameraStatus] = React.useState<"idle" | "requesting" | "ready" | "unsupported">("idle");
   const [selfieFile, setSelfieFile] = React.useState<File | null>(null);
   const [selfiePreviewUrl, setSelfiePreviewUrl] = React.useState<string | null>(null);
@@ -849,12 +836,8 @@ export function KycStepperForm() {
   }, []);
 
   const submit = async () => {
-    if (!zipFile) {
-      setError("Select your E-Aadhaar ZIP file to upload");
-      return;
-    }
-    if (!zipPassword.trim()) {
-      setError("Enter the password that unlocks your E-Aadhaar ZIP");
+    if (!pdfFile) {
+      setError("Select your document file (PDF) to upload");
       return;
     }
     if (!selfieFile) {
@@ -870,8 +853,7 @@ export function KycStepperForm() {
     setLoading(true);
     try {
       const form = new FormData();
-      form.append("file", zipFile);
-      form.append("password", zipPassword.trim());
+      form.append("file", pdfFile);
       form.append("selfie", selfieFile);
       form.append("accountHolderName", accountHolderName.trim());
       form.append("accountNumber", accountNumber.trim());
@@ -904,7 +886,7 @@ export function KycStepperForm() {
         <div className="flex items-start gap-3 rounded-lg border border-accent-200 bg-accent-50 p-4">
           <Clock size={18} className="mt-0.5 shrink-0 text-accent-700" />
           <p className="text-sm text-accent-700">
-            Your E-Aadhaar verification is under review. You&apos;ll be able to list items once an admin approves it.
+            Your document verification is under review. You&apos;ll be able to list items once an admin approves it.
           </p>
         </div>
       )}
@@ -920,33 +902,25 @@ export function KycStepperForm() {
         <div className="md:col-span-2 flex items-start gap-3 rounded-lg bg-muted/50 p-4">
           <ShieldCheck size={18} className="mt-0.5 shrink-0 text-primary" />
           <p className="text-sm leading-6 text-muted-foreground">
-            Download your E-Aadhaar as a <strong>password-protected ZIP</strong> from the official
-            e-Aadhaar website (uidai.gov.in), then upload it here along with its password and a{" "}
-            <strong>live selfie</strong> taken right now. Add your <strong>bank details for payment
-            setup</strong> so payouts can be sent to you. Our team will review it and approve your
-            KYC, after which you can list and book items.
+            Upload your identity document as a <strong>PDF</strong> (e.g. Aadhaar, PAN, passport or
+            driving licence) along with a <strong>live selfie</strong> taken right now. Add your{" "}
+            <strong>bank details for payment setup</strong> so payouts can be sent to you. Our team
+            will review it and approve your KYC, after which you can list and book items.
           </p>
         </div>
         <div>
-          <p className="mb-1.5 text-sm font-medium">E-Aadhaar ZIP file</p>
+          <p className="mb-1.5 text-sm font-medium">Identity document (PDF)</p>
           <label className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-md border-2 border-dashed border-border bg-muted/50 px-3 text-sm font-medium text-muted-foreground transition-all duration-200 hover:border-primary hover:bg-primary-50 hover:text-primary hover:shadow-sm">
             <Upload size={16} className="shrink-0" />
-            <span className="truncate">{zipFile ? zipFile.name : "Upload ZIP file"}</span>
+            <span className="truncate">{pdfFile ? pdfFile.name : "Upload PDF file"}</span>
             <input
               type="file"
-              accept=".zip,application/zip,application/x-zip-compressed"
+              accept=".pdf,application/pdf"
               className="hidden"
-              onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
             />
           </label>
         </div>
-        <Input
-          label="ZIP password"
-          type="password"
-          value={zipPassword}
-          onChange={(e) => setZipPassword(e.target.value)}
-          placeholder="Password used to open the E-Aadhaar ZIP"
-        />
         <div className="md:col-span-2">
           <div className="mb-2 flex items-center gap-2">
             <IdCard size={16} className="text-muted-foreground" />
@@ -1066,12 +1040,6 @@ export function KycStepperForm() {
           Submit for Review
         </Button>
       </div>
-      <style jsx global>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-    </div>
+      </div>
   );
 }
